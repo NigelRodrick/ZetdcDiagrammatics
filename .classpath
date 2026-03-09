@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" output="build/resources/test" path="src/test/resources">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="optional" value="true"/>
+			<attribute name="gradle.buildServer" value="true"/>
+			<attribute name="resource" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" output="build/classes/java/test" path="src/test/java">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="optional" value="true"/>
+			<attribute name="gradle.buildServer" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" output="build/resources/main" path="src/main/resources">
+		<attributes>
+			<attribute name="optional" value="true"/>
+			<attribute name="gradle.buildServer" value="true"/>
+			<attribute name="resource" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" output="build/classes/java/main" path="src/main/java">
+		<attributes>
+			<attribute name="optional" value="true"/>
+			<attribute name="gradle.buildServer" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" output="build/classes/java/test" path="build/generated/sources/annotationProcessor/java/test">
+		<attributes>
+			<attribute name="test" value="true"/>
+			<attribute name="optional" value="true"/>
+			<attribute name="gradle.buildServer" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" output="build/classes/java/main" path="build/generated/sources/annotationProcessor/java/main">
+		<attributes>
+			<attribute name="optional" value="true"/>
+			<attribute name="gradle.buildServer" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-17">
+		<attributes>
+			<attribute name="gradle.buildServer" value="true"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/ZETDC/.gradle/caches/modules-2/files-2.1/org.apache.pdfbox/pdfbox/2.0.29/875ee3970cc5000bc33e2daa427a07174482ca5a/pdfbox-2.0.29.jar" sourcepath="C:/Users/ZETDC/.gradle/caches/modules-2/files-2.1/org.apache.pdfbox/pdfbox/2.0.29/9627a1c13b494559b6decaf6a57946d4b9ec6d87/pdfbox-2.0.29-sources.jar">
+		<attributes>
+			<attribute name="gradle.buildServer" value="true"/>
+			<attribute name="groupId" value="org.apache.pdfbox"/>
+			<attribute name="artifactId" value="pdfbox"/>
+			<attribute name="version" value="2.0.29"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/ZETDC/.gradle/caches/modules-2/files-2.1/commons-logging/commons-logging/1.2/4bfc12adfe4842bf07b657f0369c4cb522955686/commons-logging-1.2.jar" sourcepath="C:/Users/ZETDC/.gradle/caches/modules-2/files-2.1/commons-logging/commons-logging/1.2/ecf26c7507d67782a3bbd148d170b31dfad001aa/commons-logging-1.2-sources.jar">
+		<attributes>
+			<attribute name="gradle.buildServer" value="true"/>
+			<attribute name="groupId" value="commons-logging"/>
+			<attribute name="artifactId" value="commons-logging"/>
+			<attribute name="version" value="1.2"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/Users/ZETDC/.gradle/caches/modules-2/files-2.1/org.apache.pdfbox/fontbox/2.0.29/6e0cd64e30d019d8b98cba9201b979934e4cdae6/fontbox-2.0.29.jar" sourcepath="C:/Users/ZETDC/.gradle/caches/modules-2/files-2.1/org.apache.pdfbox/fontbox/2.0.29/e62d9d33e52c08f5fbea45c21c3d879106aa35f9/fontbox-2.0.29-sources.jar">
+		<attributes>
+			<attribute name="gradle.buildServer" value="true"/>
+			<attribute name="groupId" value="org.apache.pdfbox"/>
+			<attribute name="artifactId" value="fontbox"/>
+			<attribute name="version" value="2.0.29"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

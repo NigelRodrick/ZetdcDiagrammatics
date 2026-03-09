@@ -1,0 +1,275 @@
+/* ZetdcDiagrammatics - Modern Desktop Application Styles */
+
+/* Root styling */
+.root {
+    -fx-base: #f0f0f0;
+    -fx-background: #ffffff;
+    -fx-control-inner-background: #ffffff;
+    -fx-accent: #2196F3;
+    -fx-focus-color: #2196F3;
+    -fx-faint-focus-color: #2196F3;
+}
+
+/* Menu Bar */
+.menu-bar {
+    -fx-background-color: #f5f5f5;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 0 1 0;
+}
+
+.menu {
+    -fx-background-color: transparent;
+}
+
+.menu:hover {
+    -fx-background-color: #e3f2fd;
+}
+
+.menu-item {
+    -fx-background-color: transparent;
+}
+
+.menu-item:hover {
+    -fx-background-color: #e3f2fd;
+}
+
+/* Tool Bar */
+.tool-bar {
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 8 12 8 12;
+}
+
+.tool-bar .button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-padding: 8 12 8 12;
+    -fx-font-size: 12px;
+    -fx-font-weight: normal;
+}
+
+.tool-bar .button:hover {
+    -fx-background-color: #e3f2fd;
+    -fx-border-color: #bbdefb;
+}
+
+.tool-bar .button.active-tool {
+    -fx-background-color: #2196F3;
+    -fx-text-fill: white;
+    -fx-border-color: #1976D2;
+}
+
+.tool-bar .button.active-tool:hover {
+    -fx-background-color: #1976D2;
+}
+
+/* Left Panel */
+.left-panel {
+    -fx-background-color: #fafafa;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 0 1 0 0;
+}
+
+.section-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #424242;
+    -fx-padding: 0 0 5 0;
+}
+
+/* Color Pickers */
+.color-picker {
+    -fx-background-color: white;
+    -fx-border-color: #e0e0e0;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+.color-picker:hover {
+    -fx-border-color: #2196F3;
+}
+
+/* Sliders */
+.slider {
+    -fx-background-color: transparent;
+}
+
+.slider .track {
+    -fx-background-color: #e0e0e0;
+    -fx-background-radius: 2;
+}
+
+.slider .thumb {
+    -fx-background-color: #2196F3;
+    -fx-background-radius: 8;
+}
+
+.slider .thumb:hover {
+    -fx-background-color: #1976D2;
+}
+
+/* Buttons */
+.button {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #e0e0e0;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-padding: 6 12 6 12;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: #f5f5f5;
+    -fx-border-color: #2196F3;
+}
+
+.button:pressed {
+    -fx-background-color: #e3f2fd;
+    -fx-border-color: #1976D2;
+}
+
+/* Drawing Canvas */
+.drawing-canvas {
+    -fx-background-color: white;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 1;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+}
+
+/* Status Bar */
+.status-bar {
+    -fx-background-color: #f5f5f5;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 1 0 0 0;
+    -fx-font-size: 11px;
+    -fx-text-fill: #666666;
+}
+
+/* Scroll Pane */
+.scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane .viewport {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane .scroll-bar:vertical {
+    -fx-background-color: #f0f0f0;
+    -fx-border-color: #e0e0e0;
+}
+
+.scroll-pane .scroll-bar:horizontal {
+    -fx-background-color: #f0f0f0;
+    -fx-border-color: #e0e0e0;
+}
+
+.scroll-pane .scroll-bar .thumb {
+    -fx-background-color: #c0c0c0;
+    -fx-background-radius: 4;
+}
+
+.scroll-pane .scroll-bar .thumb:hover {
+    -fx-background-color: #a0a0a0;
+}
+
+/* Labels */
+.label {
+    -fx-text-fill: #424242;
+    -fx-font-size: 12px;
+}
+
+/* Separators */
+.separator {
+    -fx-background-color: #e0e0e0;
+}
+
+/* Tooltips */
+.tooltip {
+    -fx-background-color: #424242;
+    -fx-text-fill: white;
+    -fx-font-size: 11px;
+    -fx-background-radius: 4;
+    -fx-padding: 6 8 6 8;
+}
+
+/* Context Menu */
+.context-menu {
+    -fx-background-color: white;
+    -fx-border-color: #e0e0e0;
+    -fx-border-width: 1;
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+}
+
+.context-menu .menu-item {
+    -fx-background-color: transparent;
+    -fx-padding: 8 16 8 16;
+}
+
+.context-menu .menu-item:hover {
+    -fx-background-color: #e3f2fd;
+}
+
+/* Focus indicators */
+.focused {
+    -fx-focus-color: #2196F3;
+    -fx-faint-focus-color: #2196F3;
+}
+
+/* Dark theme support (optional) */
+.dark-theme {
+    -fx-base: #2b2b2b;
+    -fx-background: #3c3c3c;
+    -fx-control-inner-background: #3c3c3c;
+    -fx-accent: #2196F3;
+    -fx-focus-color: #2196F3;
+    -fx-faint-focus-color: #2196F3;
+}
+
+.dark-theme .left-panel {
+    -fx-background-color: #2b2b2b;
+    -fx-border-color: #404040;
+}
+
+.dark-theme .status-bar {
+    -fx-background-color: #2b2b2b;
+    -fx-border-color: #404040;
+}
+
+.dark-theme .tool-bar {
+    -fx-background-color: #2b2b2b;
+    -fx-border-color: #404040;
+}
+
+.dark-theme .label {
+    -fx-text-fill: #e0e0e0;
+}
+
+/* Animation effects */
+.button {
+    -fx-transition: all 0.2s ease;
+}
+
+.tool-bar .button {
+    -fx-transition: all 0.15s ease;
+}
+
+/* Responsive design */
+@media (max-width: 800px) {
+    .left-panel {
+        -fx-pref-width: 150;
+    }
+    
+    .tool-bar .button {
+        -fx-padding: 6 8 6 8;
+        -fx-font-size: 11px;
+    }
+}
+
+

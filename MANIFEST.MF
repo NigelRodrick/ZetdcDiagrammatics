@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Main-Class: com.zetdc.diagrammatics.Main
+Class-Path: lib/pdfbox-2.0.30.jar lib/fontbox-2.0.30.jar lib/commons-logging-1.2.jar
+
+
+
+
