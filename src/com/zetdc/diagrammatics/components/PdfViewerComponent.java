@@ -417,6 +417,15 @@ public class PdfViewerComponent extends JPanel {
         imageCanvas.addMouseWheelListener(new MouseWheelListener() {
             @Override
             public void mouseWheelMoved(MouseWheelEvent e) {
+                // Disable zoom while a polyline is being constructed,
+                // to keep in-progress lines visually stable.
+                if (lineToggleButton.isSelected() &&
+                    currentLineType == LineType.POLYLINE &&
+                    constructingPolylinePoints != null &&
+                    !constructingPolylinePoints.isEmpty()) {
+                    return;
+                }
+
                 // Only zoom when mouse is over the image
                 if (isMouseOver) {
                     boolean zoomIn = e.getWheelRotation() < 0;
@@ -657,8 +666,16 @@ public class PdfViewerComponent extends JPanel {
             public void mouseDragged(MouseEvent e) {
                 // Handle touch move for touch screen support
                 handleTouchMove(e);
-                
-                if (isPanning && lastMousePosition != null) {
+
+                // Disable panning while a polyline is being constructed
+                // to keep in-progress lines visually stable.
+                boolean blockingPolylineInProgress =
+                    lineToggleButton.isSelected() &&
+                    currentLineType == LineType.POLYLINE &&
+                    constructingPolylinePoints != null &&
+                    !constructingPolylinePoints.isEmpty();
+
+                if (isPanning && lastMousePosition != null && !blockingPolylineInProgress) {
                     int dx = e.getX() - lastMousePosition.x;
                     int dy = e.getY() - lastMousePosition.y;
                     imageOffset.x += dx;
