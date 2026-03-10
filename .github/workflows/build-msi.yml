@@ -25,18 +25,19 @@ jobs:
           gradle fatJar
 
       - name: Create MSI installer with jpackage
+        shell: pwsh
         run: |
-          jpackage ^
-            --type msi ^
-            --name "ZetdcDiagrammatics" ^
-            --app-version 1.0.0 ^
-            --input build\libs ^
-            --main-jar zetdcschemmatics-fat.jar ^
-            --main-class com.zetdc.diagrammatics.Main ^
-            --icon zetdcschemmatics.ico ^
-            --vendor "ZETDC Southern Region" ^
-            --win-shortcut ^
-            --win-menu ^
+          jpackage `
+            --type msi `
+            --name "ZetdcDiagrammatics" `
+            --app-version 1.0.0 `
+            --input build\libs `
+            --main-jar zetdcschemmatics-fat.jar `
+            --main-class com.zetdc.diagrammatics.Main `
+            --icon zetdcschemmatics.ico `
+            --vendor "ZETDC Southern Region" `
+            --win-shortcut `
+            --win-menu `
             --dest out
 
       - name: Upload MSI artifact
