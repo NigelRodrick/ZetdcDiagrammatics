@@ -1,0 +1,47 @@
+name: Build MSI installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-msi:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build fat JAR
+        run: |
+          gradle fatJar
+
+      - name: Create MSI installer with jpackage
+        run: |
+          jpackage ^
+            --type msi ^
+            --name "ZetdcDiagrammatics" ^
+            --app-version 1.0.0 ^
+            --input build\libs ^
+            --main-jar zetdcschemmatics-fat.jar ^
+            --main-class com.zetdc.diagrammatics.Main ^
+            --icon zetdcschemmatics.ico ^
+            --vendor "ZETDC Southern Region" ^
+            --win-shortcut ^
+            --win-menu ^
+            --dest out
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZetdcDiagrammatics-msi
+          path: out\*.msi
+
