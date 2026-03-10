@@ -76,6 +76,35 @@ task fatJar(type: Jar) {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+// Sync TV-Install and Laptop-Install folders with the latest fat JAR
+tasks.register('installTvLaptop') {
+    group = 'distribution'
+    description = 'Build fat JAR and refresh TV-Install and Laptop-Install folders'
+    dependsOn fatJar
+
+    doLast {
+        def jarFile = tasks.fatJar.archiveFile.get().asFile
+
+        // Ensure install folders exist
+        def tvDir = file('TV-Install')
+        def laptopDir = file('Laptop-Install')
+        if (!tvDir.exists()) tvDir.mkdirs()
+        if (!laptopDir.exists()) laptopDir.mkdirs()
+
+        // Copy updated JAR into both folders
+        copy {
+            from jarFile
+            into tvDir
+        }
+        copy {
+            from jarFile
+            into laptopDir
+        }
+
+        println "Updated TV-Install and Laptop-Install with ${jarFile.name}"
+    }
+}
+
 // Run configuration
 run {
     // No special JVM args needed for Swing
