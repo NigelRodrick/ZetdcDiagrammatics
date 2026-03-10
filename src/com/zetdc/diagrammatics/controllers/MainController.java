@@ -247,6 +247,7 @@ public class MainController {
         JMenuItem openItem = new JMenuItem("Open...");
         JMenuItem saveChangesItem = new JMenuItem("Save Changes Permanently");
         JMenuItem exportPdfItem = new JMenuItem("Export PDF with Changes");
+        JMenuItem shareItem = new JMenuItem("Open Folder for Sharing");
         JMenuItem discardChangesItem = new JMenuItem("Discard All Changes");
         JMenuItem exitItem = new JMenuItem("Exit");
         
@@ -268,6 +269,7 @@ public class MainController {
             }
         });
         exportPdfItem.addActionListener(e -> exportPdfWithChanges());
+        shareItem.addActionListener(e -> openFolderForSharing());
         discardChangesItem.addActionListener(e -> {
             int result = JOptionPane.showConfirmDialog(
                 mainFrame,
@@ -288,6 +290,7 @@ public class MainController {
         fileMenu.addSeparator();
         fileMenu.add(saveChangesItem);
         fileMenu.add(exportPdfItem);
+        fileMenu.add(shareItem);
         fileMenu.add(discardChangesItem);
         fileMenu.addSeparator();
         fileMenu.add(exitItem);
@@ -1047,6 +1050,52 @@ public class MainController {
             System.out.println("Changes saved permanently to: " + stateFilePath);
         } catch (Exception e) {
             throw new Exception("Failed to write to file: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Opens the current PDF's project folder in the system file explorer
+     * so the user can easily share the exported/annotated documents.
+     */
+    private void openFolderForSharing() {
+        try {
+            if (currentPdfFile == null) {
+                JOptionPane.showMessageDialog(mainFrame,
+                    "No PDF is currently open. Open a diagram first.",
+                    "Share Document",
+                    JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+
+            java.nio.file.Path projectFolder = FileManager.getProjectFolderForPdf(currentPdfFile);
+
+            // Ensure annotations are up to date before sharing
+            if (pdfViewerComponent != null) {
+                filePathToMarkers.put(currentPdfFile.getAbsolutePath(), pdfViewerComponent.exportMarkers());
+                filePathToLines.put(currentPdfFile.getAbsolutePath(), pdfViewerComponent.exportLines());
+                filePathToTexts.put(currentPdfFile.getAbsolutePath(), pdfViewerComponent.exportTexts());
+                FileManager.saveAnnotations(
+                    currentPdfFile,
+                    filePathToMarkers.get(currentPdfFile.getAbsolutePath()),
+                    filePathToLines.get(currentPdfFile.getAbsolutePath()),
+                    filePathToTexts.get(currentPdfFile.getAbsolutePath())
+                );
+            }
+
+            java.awt.Desktop desktop = java.awt.Desktop.isDesktopSupported() ? java.awt.Desktop.getDesktop() : null;
+            if (desktop != null && desktop.isSupported(java.awt.Desktop.Action.OPEN)) {
+                desktop.open(projectFolder.toFile());
+            } else {
+                JOptionPane.showMessageDialog(mainFrame,
+                    "Cannot open folder automatically. Please navigate to:\n" + projectFolder.toString(),
+                    "Share Document",
+                    JOptionPane.INFORMATION_MESSAGE);
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(mainFrame,
+                "Failed to open folder for sharing: " + ex.getMessage(),
+                "Share Document",
+                JOptionPane.ERROR_MESSAGE);
         }
     }
     

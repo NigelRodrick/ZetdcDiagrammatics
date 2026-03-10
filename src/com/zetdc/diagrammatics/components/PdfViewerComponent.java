@@ -317,10 +317,8 @@ public class PdfViewerComponent extends JPanel {
     private void setupLayout() {
         setLayout(new BorderLayout());
         
-        // Top control panel
+        // Top control panel (without explicit Previous/Next buttons)
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, TvMode.SPACING, TvMode.SPACING));
-        topPanel.add(prevPageButton);
-        topPanel.add(nextPageButton);
         topPanel.add(pageLabel);
         topPanel.add(Box.createHorizontalStrut(20));
         topPanel.add(zoomInButton);
@@ -349,9 +347,6 @@ public class PdfViewerComponent extends JPanel {
     }
     
     private void setupEventHandlers() {
-        prevPageButton.addActionListener(e -> previousPage());
-        nextPageButton.addActionListener(e -> nextPage());
-        
         zoomInButton.addActionListener(e -> zoomIn());
         zoomOutButton.addActionListener(e -> zoomOut());
         fitToWidthButton.addActionListener(e -> fitToWidth());
