@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 
 /**
  * Main controller for the diagramming application
@@ -257,8 +258,12 @@ public class MainController {
             try {
                 saveAppStatePermanently();
                 hasUnsavedChanges = false;
+                String lastEditor = (pdfViewerComponent != null && pdfViewerComponent.getCurrentEditorUsername() != null
+                    && !pdfViewerComponent.getCurrentEditorUsername().trim().isEmpty())
+                    ? pdfViewerComponent.getCurrentEditorUsername().trim()
+                    : "Unknown";
                 JOptionPane.showMessageDialog(mainFrame, 
-                    "All changes have been saved permanently!", 
+                    "All changes have been saved permanently.\nLast editor: " + lastEditor, 
                     "Save Successful", 
                     JOptionPane.INFORMATION_MESSAGE);
             } catch (Exception ex) {
@@ -314,7 +319,44 @@ public class MainController {
         JMenuItem fullScreenItem = new JMenuItem("Toggle Full Screen (F11)");
         fullScreenItem.addActionListener(e -> toggleFullScreen());
         viewMenu.add(fullScreenItem);
-        
+
+        // Edits menu – entry point for editing
+        JMenu editsMenu = new JMenu("Edits");
+        if (TvMode.ENABLED) editsMenu.setFont(TvMode.getMenuFont());
+        JMenuItem startEditingItem = new JMenuItem("Start / Stop Editing (Login)");
+        JMenuItem addMarkerItem = new JMenuItem("Add Marker");
+        JMenuItem addLineItem = new JMenuItem("Add Line");
+        JMenuItem addTextItem = new JMenuItem("Add Text");
+
+        startEditingItem.addActionListener(e -> {
+            if (pdfViewerComponent != null) {
+                // Reuse the same behavior as the Edit button in the viewer (prompts for login)
+                try {
+                    java.lang.reflect.Method m = pdfViewerComponent.getClass().getDeclaredMethod("toggleEditMode");
+                    m.setAccessible(true);
+                    m.invoke(pdfViewerComponent);
+                } catch (Exception ignore) {
+                    // Ignore if reflection fails
+                }
+            }
+        });
+
+        addMarkerItem.addActionListener(e -> {
+            if (pdfViewerComponent != null) pdfViewerComponent.startAddMarkerMode();
+        });
+        addLineItem.addActionListener(e -> {
+            if (pdfViewerComponent != null) pdfViewerComponent.startAddLineMode();
+        });
+        addTextItem.addActionListener(e -> {
+            if (pdfViewerComponent != null) pdfViewerComponent.startAddTextMode();
+        });
+
+        editsMenu.add(startEditingItem);
+        editsMenu.addSeparator();
+        editsMenu.add(addMarkerItem);
+        editsMenu.add(addLineItem);
+        editsMenu.add(addTextItem);
+
         // Admin menu - add users who can make changes
         JMenu adminMenu = new JMenu("Admin");
         if (TvMode.ENABLED) adminMenu.setFont(TvMode.getMenuFont());
@@ -332,6 +374,7 @@ public class MainController {
         menuBar.add(fileMenu);
         menuBar.add(editMenu);
         menuBar.add(viewMenu);
+        menuBar.add(editsMenu);
         menuBar.add(adminMenu);
         menuBar.add(helpMenu);
         
@@ -340,21 +383,7 @@ public class MainController {
     
     private void createToolPanel() {
         toolPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        toolPanel.setBorder(BorderFactory.createTitledBorder("Application"));
-        if (TvMode.ENABLED) {
-            toolPanel.setBorder(BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(Color.GRAY),
-                "Application",
-                0, 0,
-                TvMode.getTitleFont()
-            ));
-        }
-        
-        // Add a simple label since PDF tools are now in the PDF viewer component
-        JLabel infoLabel = new JLabel("PDF tools are available in the PDF viewer above");
-        infoLabel.setForeground(Color.GRAY);
-        if (TvMode.ENABLED) infoLabel.setFont(TvMode.getLabelFont());
-        toolPanel.add(infoLabel);
+        // Panel no longer shows separate application tools; all edit tools are under the Edits menu.
     }
     
     
@@ -671,7 +700,10 @@ public class MainController {
 
             // Get document information
             String docInfo = PdfReader.getDocumentInfo(pdfFile);
-            
+
+            // Build annotations / change history summary
+            String historySection = buildAnnotationsSummary(pdfFile);
+
             // Defer text extraction to speed up initial open
             String contentPreview = "[Text preview deferred for faster open. Click 'View Full Content' to extract.]";
             
@@ -694,8 +726,8 @@ public class MainController {
                                contentPreview;
             }
             
-            // Combine information and content
-            String fullContent = docInfo + "\n" + contentSection;
+            // Combine information, change history and content
+            String fullContent = docInfo + "\n" + historySection + "\n" + contentSection;
             
             // If content is too long, truncate it
             if (fullContent.length() > 10000) {
@@ -823,6 +855,9 @@ public class MainController {
             
             // Get document info
             String docInfo = PdfReader.getDocumentInfo(currentPdfFile);
+
+            // Build annotations / change history summary
+            String historySection = buildAnnotationsSummary(currentPdfFile);
             
             // Check if content is meaningful
             String contentSection;
@@ -851,8 +886,8 @@ public class MainController {
                                fullContent;
             }
             
-            // Combine info and content
-            String completeContent = docInfo + "\n" + contentSection;
+            // Combine info, change history and content
+            String completeContent = docInfo + "\n" + historySection + "\n" + contentSection;
             
             pdfContentArea.setText(completeContent);
             pdfContentArea.setCaretPosition(0); // Scroll to top
@@ -868,6 +903,104 @@ public class MainController {
             pdfContentArea.setText(errorContent);
             pdfContentArea.setCaretPosition(0);
         }
+    }
+
+    /**
+     * Build a summary of annotations and a simple change history
+     * for the specified PDF file, based on the stored markers,
+     * lines and text annotations (including their creators).
+     */
+    private String buildAnnotationsSummary(File pdfFile) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Annotations & Change History:\n");
+        sb.append("================================\n\n");
+
+        String path = pdfFile.getAbsolutePath();
+
+        // Ensure we have the latest state from the viewer for this file
+        if (currentPdfFile != null &&
+            currentPdfFile.equals(pdfFile) &&
+            pdfViewerComponent != null) {
+            filePathToMarkers.put(path, pdfViewerComponent.exportMarkers());
+            filePathToLines.put(path, pdfViewerComponent.exportLines());
+            filePathToTexts.put(path, pdfViewerComponent.exportTexts());
+        }
+
+        Map<Integer, List<PdfViewerComponent.MarkerDTO>> markers =
+            filePathToMarkers.getOrDefault(path, new HashMap<>());
+        Map<Integer, List<PdfViewerComponent.LineDTO>> lines =
+            filePathToLines.getOrDefault(path, new HashMap<>());
+        Map<Integer, List<PdfViewerComponent.TextDTO>> texts =
+            filePathToTexts.getOrDefault(path, new HashMap<>());
+
+        int markerCount = 0;
+        int lineCount = 0;
+        int textCount = 0;
+        java.util.Set<String> editors = new java.util.HashSet<>();
+
+        for (List<PdfViewerComponent.MarkerDTO> list : markers.values()) {
+            markerCount += list.size();
+            for (PdfViewerComponent.MarkerDTO m : list) {
+                if (m.createdBy != null && !m.createdBy.trim().isEmpty()) {
+                    editors.add(m.createdBy.trim());
+                }
+            }
+        }
+        for (List<PdfViewerComponent.LineDTO> list : lines.values()) {
+            lineCount += list.size();
+            for (PdfViewerComponent.LineDTO l : list) {
+                if (l.createdBy != null && !l.createdBy.trim().isEmpty()) {
+                    editors.add(l.createdBy.trim());
+                }
+            }
+        }
+        for (List<PdfViewerComponent.TextDTO> list : texts.values()) {
+            textCount += list.size();
+            for (PdfViewerComponent.TextDTO t : list) {
+                if (t.createdBy != null && !t.createdBy.trim().isEmpty()) {
+                    editors.add(t.createdBy.trim());
+                }
+            }
+        }
+
+        sb.append("Total markers: ").append(markerCount).append("\n");
+        sb.append("Total lines:   ").append(lineCount).append("\n");
+        sb.append("Total notes:   ").append(textCount).append("\n\n");
+
+        if (!editors.isEmpty()) {
+            sb.append("Editors who made changes:\n");
+            for (String editor : editors) {
+                sb.append("  • ").append(editor).append("\n");
+            }
+            sb.append("\n");
+        } else {
+            sb.append("No recorded editors for this document yet.\n\n");
+        }
+
+        sb.append("Per‑page annotation summary:\n");
+        sb.append("--------------------------------\n");
+
+        java.util.SortedSet<Integer> pages = new java.util.TreeSet<>();
+        pages.addAll(markers.keySet());
+        pages.addAll(lines.keySet());
+        pages.addAll(texts.keySet());
+
+        if (pages.isEmpty()) {
+            sb.append("No annotations have been created for this document.\n");
+        } else {
+            for (Integer page : pages) {
+                int mc = markers.getOrDefault(page, java.util.Collections.emptyList()).size();
+                int lc = lines.getOrDefault(page, java.util.Collections.emptyList()).size();
+                int tc = texts.getOrDefault(page, java.util.Collections.emptyList()).size();
+                sb.append("Page ").append(page).append(": ")
+                  .append(mc).append(" markers, ")
+                  .append(lc).append(" lines, ")
+                  .append(tc).append(" notes\n");
+            }
+        }
+
+        sb.append("\n");
+        return sb.toString();
     }
     
     private void toggleFullScreen() {
@@ -1772,147 +1905,184 @@ public class MainController {
     
     private void exportPdfWithAnnotations(File sourceFile, File targetFile) throws Exception {
         try {
-            // Try to create PDF with visual annotations drawn on pages
-            exportPdfWithPDFBox(sourceFile, targetFile);
-            System.out.println("PDF exported with visual annotations successfully!");
+            // Robust path: render each page (with annotations) to an image and build a new PDF.
+            exportPdfAsImages(sourceFile, targetFile);
+            System.out.println("PDF exported with annotated page images successfully!");
         } catch (Exception e) {
-            // Fallback to companion file method if visual export fails
-            System.out.println("Visual export failed, using companion file method: " + e.getMessage());
+            // Fallback to companion file method if even image export fails
+            System.out.println("Image-based export failed, using companion file method: " + e.getMessage());
             exportPdfWithCompanionFile(sourceFile, targetFile);
             throw new Exception("PDF visual annotation embedding failed, created companion file instead: " + e.getMessage());
         }
     }
-    
-    private void exportPdfWithPDFBox(File sourceFile, File targetFile) throws Exception {
-        // Use PDFBox to create a new PDF with visual annotations drawn on the pages
+
+    /**
+     * Robust export: render each page (with annotations) as an image and
+     * create a new PDF composed of those page images.
+     */
+    private void exportPdfAsImages(File sourceFile, File targetFile) throws Exception {
+        // Prepare PDFBox classes via reflection
         Class<?> pdDocumentClass = Class.forName("org.apache.pdfbox.pdmodel.PDDocument");
         Class<?> pdPageClass = Class.forName("org.apache.pdfbox.pdmodel.PDPage");
-        Class<?> pdStreamClass = Class.forName("org.apache.pdfbox.pdmodel.PDPageContentStream");
-        Class<?> pdFontClass = Class.forName("org.apache.pdfbox.pdmodel.font.PDType1Font");
-        Class<?> pdColorClass = Class.forName("org.apache.pdfbox.pdmodel.graphics.color.PDColor");
-        Class<?> pdDeviceRgbClass = Class.forName("org.apache.pdfbox.pdmodel.graphics.color.PDDeviceRGB");
-        
-        // Load source document
-        Object sourceDoc = pdDocumentClass.getMethod("load", File.class).invoke(null, sourceFile);
-        
-        // Create new document
+        Class<?> pdRectClass = Class.forName("org.apache.pdfbox.pdmodel.common.PDRectangle");
+        Class<?> imageXObjectClass = Class.forName("org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject");
+        Class<?> losslessFactoryClass = Class.forName("org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory");
+        Class<?> contentStreamClass = Class.forName("org.apache.pdfbox.pdmodel.PDPageContentStream");
+
+        // New document that will contain image pages
         Object targetDoc = pdDocumentClass.getConstructor().newInstance();
-        
-        // Get page count
-        int pageCount = (Integer) pdDocumentClass.getMethod("getNumberOfPages").invoke(sourceDoc);
-        
-        // Copy pages and add annotations
-        for (int pageIndex = 0; pageIndex < pageCount; pageIndex++) {
-            Object sourcePage = pdDocumentClass.getMethod("getPage", int.class).invoke(sourceDoc, pageIndex);
-            
-            // Clone the source page to preserve all content
-            Object targetPage = sourcePage.getClass().getMethod("clone").invoke(sourcePage);
-            targetDoc.getClass().getMethod("addPage", pdPageClass).invoke(targetDoc, targetPage);
-            
-            // Add annotations for this page
-            if (pdfViewerComponent != null && currentPdfFile != null) {
-                // Get current annotations directly from the viewer component
-                Map<Integer, List<PdfViewerComponent.MarkerDTO>> markers = pdfViewerComponent.exportMarkers();
-                Map<Integer, List<PdfViewerComponent.LineDTO>> lines = pdfViewerComponent.exportLines();
-                Map<Integer, List<PdfViewerComponent.TextDTO>> texts = pdfViewerComponent.exportTexts();
-                
-                // Create content stream for drawing annotations
-                Object appendMode = pdStreamClass.getDeclaredClasses()[0].getField("APPEND").get(null);
-                Object contentStream = pdStreamClass.getConstructor(pdPageClass, appendMode.getClass())
-                    .newInstance(targetPage, appendMode);
-                
-                // Add markers for this page
-                if (markers != null && markers.containsKey(pageIndex)) {
-                    List<PdfViewerComponent.MarkerDTO> pageMarkers = markers.get(pageIndex);
-                    for (PdfViewerComponent.MarkerDTO marker : pageMarkers) {
-                        // Draw marker as a red circle
-                        Object redColor = pdDeviceRgbClass.getConstructor().newInstance();
-                        Object color = pdColorClass.getConstructor(pdDeviceRgbClass, float[].class)
-                            .newInstance(redColor, new float[]{1.0f, 0.0f, 0.0f});
-                        
-                        contentStream.getClass().getMethod("setNonStrokingColor", pdColorClass).invoke(contentStream, color);
-                        contentStream.getClass().getMethod("addEllipse", float.class, float.class, float.class, float.class)
-                            .invoke(contentStream, marker.x - 5, marker.y - 5, 10, 10);
-                        contentStream.getClass().getMethod("fill").invoke(contentStream);
-                        
-                        // Add text if present
-                        if (marker.text != null && !marker.text.trim().isEmpty()) {
-                            Object blackColor = pdColorClass.getConstructor(pdDeviceRgbClass, float[].class)
-                                .newInstance(redColor, new float[]{0.0f, 0.0f, 0.0f});
-                            contentStream.getClass().getMethod("setNonStrokingColor", pdColorClass).invoke(contentStream, blackColor);
-                            contentStream.getClass().getMethod("setFont", pdFontClass, float.class)
-                                .invoke(contentStream, pdFontClass.getField("HELVETICA").get(null), 8.0f);
-                            contentStream.getClass().getMethod("beginText").invoke(contentStream);
-                            contentStream.getClass().getMethod("newLineAtOffset", float.class, float.class)
-                                .invoke(contentStream, marker.x + 10, marker.y);
-                            contentStream.getClass().getMethod("showText", String.class)
-                                .invoke(contentStream, marker.text);
-                            contentStream.getClass().getMethod("endText").invoke(contentStream);
-                        }
+
+        // Get current annotations snapshot once
+        Map<Integer, List<PdfViewerComponent.MarkerDTO>> markers =
+            pdfViewerComponent != null ? pdfViewerComponent.exportMarkers() : new HashMap<>();
+        Map<Integer, List<PdfViewerComponent.LineDTO>> lines =
+            pdfViewerComponent != null ? pdfViewerComponent.exportLines() : new HashMap<>();
+        Map<Integer, List<PdfViewerComponent.TextDTO>> texts =
+            pdfViewerComponent != null ? pdfViewerComponent.exportTexts() : new HashMap<>();
+
+        // Number of pages
+        int pageCount = PdfRenderer.getPageCount(sourceFile);
+
+        for (int pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
+            // Render base PDF page as image
+            java.awt.image.BufferedImage pageImage =
+                PdfRenderer.renderPage(sourceFile, pageNumber, 1.0f);
+
+            // Draw annotations onto the image
+            java.awt.image.BufferedImage annotated =
+                new java.awt.image.BufferedImage(pageImage.getWidth(), pageImage.getHeight(),
+                                                 java.awt.image.BufferedImage.TYPE_INT_RGB);
+            Graphics2D g2 = annotated.createGraphics();
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                                java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.drawImage(pageImage, 0, 0, null);
+
+            int pageKey = pageNumber; // annotations use 1-based page indices
+
+            // Markers
+            List<PdfViewerComponent.MarkerDTO> pageMarkers =
+                markers != null ? markers.get(pageKey) : null;
+            if (pageMarkers != null) {
+                for (PdfViewerComponent.MarkerDTO m : pageMarkers) {
+                    int cx = Math.round(m.x);
+                    int cy = Math.round(m.y);
+                    int r = 8;
+                    int d = r * 2;
+                    Color color = new Color(m.colorRgb, true);
+                    g2.setColor(color);
+                    g2.fillOval(cx - r, cy - r, d, d);
+                    g2.setColor(Color.WHITE);
+                    g2.setStroke(new BasicStroke(2f));
+                    g2.drawOval(cx - r, cy - r, d, d);
+
+                    if (m.text != null && !m.text.trim().isEmpty()) {
+                        String text = m.text.trim();
+                        Font base = g2.getFont();
+                        g2.setFont(base.deriveFont(12f));
+                        FontMetrics fm = g2.getFontMetrics();
+                        int pad = 4;
+                        int tw = fm.stringWidth(text);
+                        int th = fm.getHeight();
+                        int bx = cx + r + 8;
+                        int by = cy - th / 2;
+                        g2.setColor(new Color(0, 0, 0, 170));
+                        g2.fillRoundRect(bx - pad, by - th + fm.getAscent() - pad,
+                                         tw + pad * 2, th + pad,
+                                         6, 6);
+                        g2.setColor(Color.WHITE);
+                        g2.drawString(text, bx, by);
                     }
                 }
-                
-                // Add lines for this page
-                if (lines != null && lines.containsKey(pageIndex)) {
-                    List<PdfViewerComponent.LineDTO> pageLines = lines.get(pageIndex);
-                    for (PdfViewerComponent.LineDTO line : pageLines) {
-                        // Draw line
-                        Object redColor = pdDeviceRgbClass.getConstructor().newInstance();
-                        Object color = pdColorClass.getConstructor(pdDeviceRgbClass, float[].class)
-                            .newInstance(redColor, new float[]{1.0f, 0.0f, 0.0f});
-                        
-                        contentStream.getClass().getMethod("setStrokingColor", pdColorClass).invoke(contentStream, color);
-                        contentStream.getClass().getMethod("setLineWidth", float.class).invoke(contentStream, 2.0f);
-                        contentStream.getClass().getMethod("moveTo", float.class, float.class)
-                            .invoke(contentStream, line.startX, line.startY);
-                        contentStream.getClass().getMethod("lineTo", float.class, float.class)
-                            .invoke(contentStream, line.endX, line.endY);
-                        contentStream.getClass().getMethod("stroke").invoke(contentStream);
-                    }
-                }
-                
-                // Add texts for this page
-                if (texts != null && texts.containsKey(pageIndex)) {
-                    List<PdfViewerComponent.TextDTO> pageTexts = texts.get(pageIndex);
-                    for (PdfViewerComponent.TextDTO text : pageTexts) {
-                        // Draw text background
-                        Object yellowColor = pdDeviceRgbClass.getConstructor().newInstance();
-                        Object bgColor = pdColorClass.getConstructor(pdDeviceRgbClass, float[].class)
-                            .newInstance(yellowColor, new float[]{1.0f, 1.0f, 0.0f});
-                        
-                        contentStream.getClass().getMethod("setNonStrokingColor", pdColorClass).invoke(contentStream, bgColor);
-                        contentStream.getClass().getMethod("addRect", float.class, float.class, float.class, float.class)
-                            .invoke(contentStream, text.x, text.y - 15, 100, 20);
-                        contentStream.getClass().getMethod("fill").invoke(contentStream);
-                        
-                        // Draw text
-                        Object blackColor = pdColorClass.getConstructor(pdDeviceRgbClass, float[].class)
-                            .newInstance(yellowColor, new float[]{0.0f, 0.0f, 0.0f});
-                        contentStream.getClass().getMethod("setNonStrokingColor", pdColorClass).invoke(contentStream, blackColor);
-                        contentStream.getClass().getMethod("setFont", pdFontClass, float.class)
-                            .invoke(contentStream, pdFontClass.getField("HELVETICA").get(null), 10.0f);
-                        contentStream.getClass().getMethod("beginText").invoke(contentStream);
-                        contentStream.getClass().getMethod("newLineAtOffset", float.class, float.class)
-                            .invoke(contentStream, text.x + 2, text.y - 5);
-                        contentStream.getClass().getMethod("showText", String.class)
-                            .invoke(contentStream, text.text);
-                        contentStream.getClass().getMethod("endText").invoke(contentStream);
-                    }
-                }
-                
-                // Close content stream
-                contentStream.getClass().getMethod("close").invoke(contentStream);
             }
+
+            // Lines
+            List<PdfViewerComponent.LineDTO> pageLines =
+                lines != null ? lines.get(pageKey) : null;
+            if (pageLines != null) {
+                for (PdfViewerComponent.LineDTO l : pageLines) {
+                    g2.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g2.setColor(Color.RED);
+                    int x1 = Math.round(l.startX);
+                    int y1 = Math.round(l.startY);
+                    int x2 = Math.round(l.endX);
+                    int y2 = Math.round(l.endY);
+                    g2.drawLine(x1, y1, x2, y2);
+
+                    if (l.text != null && !l.text.trim().isEmpty()) {
+                        String text = l.text.trim();
+                        Font base = g2.getFont();
+                        g2.setFont(base.deriveFont(12f));
+                        FontMetrics fm = g2.getFontMetrics();
+                        int pad = 4;
+                        int midX = (x1 + x2) / 2;
+                        int midY = (y1 + y2) / 2;
+                        int tw = fm.stringWidth(text);
+                        int th = fm.getHeight();
+                        g2.setColor(new Color(0, 0, 0, 170));
+                        g2.fillRoundRect(midX - tw / 2 - pad, midY - th / 2 - pad + fm.getAscent() - th,
+                                         tw + pad * 2, th + pad,
+                                         6, 6);
+                        g2.setColor(Color.WHITE);
+                        g2.drawString(text, midX - tw / 2, midY);
+                    }
+                }
+            }
+
+            // Text annotations
+            List<PdfViewerComponent.TextDTO> pageTexts =
+                texts != null ? texts.get(pageKey) : null;
+            if (pageTexts != null) {
+                for (PdfViewerComponent.TextDTO t : pageTexts) {
+                    String label = t.text != null ? t.text : "";
+                    Color bg = new Color(t.backgroundColorRgb, true);
+                    Font base = g2.getFont();
+                    g2.setFont(base.deriveFont(12f));
+                    FontMetrics fm = g2.getFontMetrics();
+                    int pad = 4;
+                    int drawX = Math.round(t.x);
+                    int drawY = Math.round(t.y);
+                    int tw = fm.stringWidth(label);
+                    int th = fm.getHeight();
+
+                    g2.setColor(bg);
+                    g2.fillRoundRect(drawX - pad,
+                                     drawY - th + fm.getAscent() - pad,
+                                     tw + pad * 2,
+                                     th + pad,
+                                     6, 6);
+                    g2.setColor(Color.BLACK);
+                    g2.drawString(label, drawX, drawY);
+                }
+            }
+
+            g2.dispose();
+
+            // Create PDF page sized to the image
+            float width = annotated.getWidth();
+            float height = annotated.getHeight();
+            Object rect = pdRectClass.getConstructor(float.class, float.class)
+                                     .newInstance(width, height);
+            Object page = pdPageClass.getConstructor(pdRectClass).newInstance(rect);
+            pdDocumentClass.getMethod("addPage", pdPageClass).invoke(targetDoc, page);
+
+            // Create image XObject from annotated image
+            Object imageXObject = losslessFactoryClass
+                .getMethod("createFromImage", pdDocumentClass, java.awt.image.BufferedImage.class)
+                .invoke(null, targetDoc, annotated);
+
+            // Draw image to fill the page
+            Object contentStream = contentStreamClass
+                .getConstructor(pdDocumentClass, pdPageClass)
+                .newInstance(targetDoc, page);
+            contentStreamClass
+                .getMethod("drawImage", imageXObjectClass, float.class, float.class, float.class, float.class)
+                .invoke(contentStream, imageXObject, 0f, 0f, width, height);
+            contentStreamClass.getMethod("close").invoke(contentStream);
         }
-        
-        // Save target document
-        targetDoc.getClass().getMethod("save", File.class).invoke(targetDoc, targetFile);
-        
-        // Close documents
-        sourceDoc.getClass().getMethod("close").invoke(sourceDoc);
-        targetDoc.getClass().getMethod("close").invoke(targetDoc);
-        
-        System.out.println("PDF exported with visual annotations drawn on pages");
+
+        // Save and close
+        pdDocumentClass.getMethod("save", File.class).invoke(targetDoc, targetFile);
+        pdDocumentClass.getMethod("close").invoke(targetDoc);
     }
     
     private void exportPdfWithCompanionFile(File sourceFile, File targetFile) throws Exception {
@@ -2064,9 +2234,11 @@ public class MainController {
                     ImageIcon logoIcon = new ImageIcon(logoBytes);
                     Image logoImage = logoIcon.getImage();
                     
-                    // Scale the image to appropriate icon size (16x16, 32x32, 48x48)
-                    Image scaledIcon = logoImage.getScaledInstance(32, 32, Image.SCALE_SMOOTH);
-                    mainFrame.setIconImage(scaledIcon);
+                    // Provide multiple sizes so the OS can pick the best one
+                    Image icon16 = logoImage.getScaledInstance(16, 16, Image.SCALE_SMOOTH);
+                    Image icon32 = logoImage.getScaledInstance(32, 32, Image.SCALE_SMOOTH);
+                    Image icon48 = logoImage.getScaledInstance(48, 48, Image.SCALE_SMOOTH);
+                    mainFrame.setIconImages(Arrays.asList(icon16, icon32, icon48));
                     
                     System.out.println("Application icon loaded from: " + logoPath);
                     return;
@@ -2084,20 +2256,24 @@ public class MainController {
     
     private void createDefaultIcon() {
         try {
-            // Create a simple default icon
-            java.awt.image.BufferedImage iconImage = new java.awt.image.BufferedImage(32, 32, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            // Create a simple default icon with stronger contrast
+            int size = 48;
+            java.awt.image.BufferedImage iconImage = new java.awt.image.BufferedImage(size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = iconImage.createGraphics();
             g2d.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
             
-            // Draw a simple "Z" icon
-            g2d.setColor(new Color(0, 120, 215));
-            g2d.fillRect(0, 0, 32, 32);
+            // Draw a simple "Z" icon with ZESA‑style blue and a bold letter
+            g2d.setColor(new Color(0, 70, 160));
+            g2d.fillRoundRect(0, 0, size, size, 10, 10);
             g2d.setColor(Color.WHITE);
-            g2d.setFont(new Font("Arial", Font.BOLD, 20));
-            g2d.drawString("Z", 8, 22);
+            g2d.setFont(new Font("Arial", Font.BOLD, 28));
+            g2d.drawString("Z", 14, 32);
             
             g2d.dispose();
-            mainFrame.setIconImage(iconImage);
+            // Provide multiple sizes for better visibility in different title bars
+            Image icon16 = iconImage.getScaledInstance(16, 16, Image.SCALE_SMOOTH);
+            Image icon32 = iconImage.getScaledInstance(32, 32, Image.SCALE_SMOOTH);
+            mainFrame.setIconImages(Arrays.asList(icon16, icon32, iconImage));
             System.out.println("Default application icon created");
         } catch (Exception e) {
             System.out.println("Error creating default icon: " + e.getMessage());

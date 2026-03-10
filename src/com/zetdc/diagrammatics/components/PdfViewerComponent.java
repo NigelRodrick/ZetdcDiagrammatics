@@ -215,6 +215,8 @@ public class PdfViewerComponent extends JPanel {
     private int selectedLineIndex = -1; // index in current page lines
     
     private String currentEditorUsername;
+    // Touch-friendly polyline double-tap finalize support
+    private long lastPolylineTapTime = 0L;
 
     public PdfViewerComponent(UserService userService) {
         this.userService = userService != null ? userService : new UserService();
@@ -241,6 +243,13 @@ public class PdfViewerComponent extends JPanel {
      * "Make Changes" button.
      */
     public void startAddMarkerMode() {
+        if (!editModeActive) {
+            JOptionPane.showMessageDialog(this,
+                "You must enter Edit mode first (via the Edits menu).",
+                "Edit Mode Required",
+                JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
         if (!markerToggleButton.isSelected()) {
             // Use doClick so all existing listeners run
             markerToggleButton.doClick();
@@ -248,12 +257,26 @@ public class PdfViewerComponent extends JPanel {
     }
     
     public void startAddLineMode() {
+        if (!editModeActive) {
+            JOptionPane.showMessageDialog(this,
+                "You must enter Edit mode first (via the Edits menu).",
+                "Edit Mode Required",
+                JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
         if (!lineToggleButton.isSelected()) {
             lineToggleButton.doClick();
         }
     }
     
     public void startAddTextMode() {
+        if (!editModeActive) {
+            JOptionPane.showMessageDialog(this,
+                "You must enter Edit mode first (via the Edits menu).",
+                "Edit Mode Required",
+                JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
         if (!textToggleButton.isSelected()) {
             textToggleButton.doClick();
         }
@@ -893,6 +916,23 @@ public class PdfViewerComponent extends JPanel {
             if (touchDuration < LONG_PRESS_DURATION && touchStartPoint != null) {
                 // Quick tap - existing mouse handlers will process it automatically
                 // Touch events are converted to mouse events by the system
+
+                // Extra behavior for TV/touch: if drawing a polyline, double-tap finishes the line
+                if (lineToggleButton.isSelected() &&
+                    currentLineType == LineType.POLYLINE &&
+                    constructingPolylinePoints != null &&
+                    !constructingPolylinePoints.isEmpty()) {
+
+                    long now = System.currentTimeMillis();
+                    // If second tap within 400ms, finalize the polyline
+                    if (now - lastPolylineTapTime <= 400L) {
+                        finalizePolyline();
+                        throttledRepaint();
+                        lastPolylineTapTime = 0L;
+                    } else {
+                        lastPolylineTapTime = now;
+                    }
+                }
             }
         }
         
