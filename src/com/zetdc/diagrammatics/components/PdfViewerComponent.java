@@ -226,6 +226,10 @@ public class PdfViewerComponent extends JPanel {
         setupPerformanceOptimizations();
         setEditButtonsVisible(false);
     }
+
+    public String getCurrentEditorUsername() {
+        return currentEditorUsername;
+    }
     
     public void setMainController(com.zetdc.diagrammatics.controllers.MainController controller) {
         this.mainController = controller;
@@ -316,33 +320,13 @@ public class PdfViewerComponent extends JPanel {
     
     private void setupLayout() {
         setLayout(new BorderLayout());
-        
-        // Top control panel (without explicit Previous/Next buttons)
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, TvMode.SPACING, TvMode.SPACING));
-        topPanel.add(pageLabel);
-        topPanel.add(Box.createHorizontalStrut(20));
-        topPanel.add(zoomInButton);
-        topPanel.add(zoomOutButton);
-        topPanel.add(fitToWidthButton);
-        topPanel.add(fitToFullButton);
-        topPanel.add(Box.createHorizontalStrut(20));
-        topPanel.add(editModeButton);
-        topPanel.add(markerToggleButton);
-        topPanel.add(lineToggleButton);
-        topPanel.add(textToggleButton);
-        topPanel.add(doneMovingButton);
-        
-        // Control panel - simplified without scale slider
-        JPanel controlPanel = new JPanel(new BorderLayout());
-        controlPanel.add(topPanel, BorderLayout.NORTH);
-        
-        // Main content area
+
+        // Main content area – fill directly under menu bar for both TV and laptop
         JScrollPane scrollPane = new JScrollPane(imageCanvas);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         TouchSupport.configureTouchScrollPane(scrollPane);
-        
-        add(controlPanel, BorderLayout.NORTH);
+
         add(scrollPane, BorderLayout.CENTER);
     }
     
@@ -1536,6 +1520,7 @@ public class PdfViewerComponent extends JPanel {
         if (editModeActive) {
             // Exit edit mode - hide edit buttons
             editModeActive = false;
+            currentEditorUsername = null;
             markerToggleButton.setSelected(false);
             lineToggleButton.setSelected(false);
             textToggleButton.setSelected(false);
