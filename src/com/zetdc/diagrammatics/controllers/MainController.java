@@ -323,7 +323,7 @@ public class MainController {
         // Edits menu – entry point for editing
         JMenu editsMenu = new JMenu("Edits");
         if (TvMode.ENABLED) editsMenu.setFont(TvMode.getMenuFont());
-        JMenuItem startEditingItem = new JMenuItem("Start / Stop Editing (Login)");
+        JMenuItem startEditingItem = new JMenuItem("Start Editing (Login)");
         JMenuItem addMarkerItem = new JMenuItem("Add Marker");
         JMenuItem addLineItem = new JMenuItem("Add Line");
         JMenuItem addTextItem = new JMenuItem("Add Text");
@@ -337,6 +337,18 @@ public class MainController {
                     m.invoke(pdfViewerComponent);
                 } catch (Exception ignore) {
                     // Ignore if reflection fails
+                }
+
+                // After toggling, update the menu text based on edit mode state
+                if (pdfViewerComponent.isEditModeActive()) {
+                    String user = pdfViewerComponent.getCurrentEditorUsername();
+                    if (user != null && !user.trim().isEmpty()) {
+                        startEditingItem.setText("Log out (" + user.trim() + ")");
+                    } else {
+                        startEditingItem.setText("Log out");
+                    }
+                } else {
+                    startEditingItem.setText("Start Editing (Login)");
                 }
             }
         });

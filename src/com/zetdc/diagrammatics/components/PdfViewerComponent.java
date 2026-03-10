@@ -232,6 +232,10 @@ public class PdfViewerComponent extends JPanel {
     public String getCurrentEditorUsername() {
         return currentEditorUsername;
     }
+
+    public boolean isEditModeActive() {
+        return editModeActive;
+    }
     
     public void setMainController(com.zetdc.diagrammatics.controllers.MainController controller) {
         this.mainController = controller;
