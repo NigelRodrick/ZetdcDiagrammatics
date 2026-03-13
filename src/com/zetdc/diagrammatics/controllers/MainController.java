@@ -327,6 +327,7 @@ public class MainController {
         JMenuItem addMarkerItem = new JMenuItem("Add Marker");
         JMenuItem addLineItem = new JMenuItem("Add Line");
         JMenuItem addTextItem = new JMenuItem("Add Text");
+        JMenuItem deleteSelectedItem = new JMenuItem("Delete Selected (Marker/Line/Text)");
 
         startEditingItem.addActionListener(e -> {
             if (pdfViewerComponent != null) {
@@ -362,12 +363,20 @@ public class MainController {
         addTextItem.addActionListener(e -> {
             if (pdfViewerComponent != null) pdfViewerComponent.startAddTextMode();
         });
+        deleteSelectedItem.addActionListener(e -> {
+            if (pdfViewerComponent != null) {
+                // Use existing Delete key behavior via a helper: prioritize line, then marker, then text
+                pdfViewerComponent.deleteCurrentSelection();
+            }
+        });
 
         editsMenu.add(startEditingItem);
         editsMenu.addSeparator();
         editsMenu.add(addMarkerItem);
         editsMenu.add(addLineItem);
         editsMenu.add(addTextItem);
+        editsMenu.addSeparator();
+        editsMenu.add(deleteSelectedItem);
 
         // Admin menu - add users who can make changes
         JMenu adminMenu = new JMenu("Admin");
@@ -1064,6 +1073,7 @@ public class MainController {
                         "A modern PDF viewing and annotation application\n" +
                         "Built with Java Swing\n\n" +
                         "Developer: Nigel Onai Rodrick Sibanda\n" +
+                        "System Engineer: Engineer Rungano Ziwani\n" +
                         "Organization: ZETDC Southern Region\n\n" +
                         "Features:\n" +
                         "• PDF file viewing and navigation\n" +

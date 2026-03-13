@@ -236,6 +236,24 @@ public class PdfViewerComponent extends JPanel {
     public boolean isEditModeActive() {
         return editModeActive;
     }
+
+    /**
+     * Delete whichever annotation is currently selected, if any.
+     * Order of precedence: line, then marker, then text.
+     */
+    public void deleteCurrentSelection() {
+        if (selectedLineIndex != -1) {
+            deleteSelectedLine();
+            return;
+        }
+        if (selectedMarkerIndex != -1) {
+            deleteSelectedMarker();
+            return;
+        }
+        if (selectedTextIndex != -1) {
+            deleteSelectedText();
+        }
+    }
     
     public void setMainController(com.zetdc.diagrammatics.controllers.MainController controller) {
         this.mainController = controller;
@@ -492,6 +510,28 @@ public class PdfViewerComponent extends JPanel {
                 }
 
                 if (SwingUtilities.isLeftMouseButton(e)) {
+                    // Double-click on existing annotations: open edit/delete context menus
+                    if (e.getClickCount() == 2) {
+                        int markerHit = hitTestMarker(e.getPoint());
+                        if (markerHit != -1) {
+                            selectMarker(markerHit);
+                            showMarkerContextMenu(e.getX(), e.getY());
+                            return;
+                        }
+                        int textHitIndex = hitTestText(e.getPoint());
+                        if (textHitIndex != -1) {
+                            selectText(textHitIndex);
+                            showTextContextMenu(e.getX(), e.getY());
+                            return;
+                        }
+                        int lineHitIndex = hitTestLine(e.getPoint());
+                        if (lineHitIndex != -1) {
+                            selectLine(lineHitIndex);
+                            showLineContextMenu(e.getX(), e.getY());
+                            return;
+                        }
+                    }
+
                     // If editing position of a selected marker, set it to this click
                     if (isEditingMarkerPosition && selectedMarkerIndex != -1) {
                         List<Marker> markers = pageIndexToMarkers.get(currentPage);
@@ -1792,6 +1832,7 @@ public class PdfViewerComponent extends JPanel {
         markers.remove(selectedMarkerIndex);
         selectedMarkerIndex = -1;
         imageCanvas.repaint();
+        notifyChangesMade();
     }
 
     private void editSelectedMarkerText() {
@@ -1819,6 +1860,7 @@ public class PdfViewerComponent extends JPanel {
         texts.remove(selectedTextIndex);
         selectedTextIndex = -1;
         imageCanvas.repaint();
+        notifyChangesMade();
     }
     
     private void editSelectedText() {
@@ -2065,7 +2107,7 @@ public class PdfViewerComponent extends JPanel {
                 // Draw page image with pan offset
                 g2.drawImage(currentPageImage, imageOffset.x, imageOffset.y, null);
 
-                // Draw markers for current page, scaled and panned
+                // Draw markers for current page, scaled and panned (Google Earth style pins)
                 List<Marker> markers = pageIndexToMarkers.get(currentPage);
                 if (markers != null && !markers.isEmpty()) {
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -2073,15 +2115,32 @@ public class PdfViewerComponent extends JPanel {
                         Marker m = markers.get(i);
                         int drawX = Math.round(m.position.x * scale) + imageOffset.x;
                         int drawY = Math.round(m.position.y * scale) + imageOffset.y;
-                        int baseR = Math.max(6, Math.round(6 * scale));
-                        int wobble = (isEditingMarkerPosition && i == selectedMarkerIndex) ? (int)Math.round(Math.max(1, scale) * (2 + ((System.currentTimeMillis() / 120) % 3))) : 0;
-                        int r = baseR + wobble;
+
+                        // Base sizes scaled with zoom
+                        int pinRadius = Math.max(6, Math.round(6 * scale));
+                        int stemHeight = Math.max(10, Math.round(12 * scale));
+
+                        // Wobble effect while moving a marker
+                        int wobble = (isEditingMarkerPosition && i == selectedMarkerIndex)
+                            ? (int) Math.round(Math.max(1, scale) * (2 + ((System.currentTimeMillis() / 120) % 3)))
+                            : 0;
+
+                        int r = pinRadius + wobble;
                         int d = r * 2;
 
-                        // Marker fill
+                        // Draw stem (pin tail)
+                        int stemX = drawX;
+                        int stemYTop = drawY + r;
+                        int stemYBottom = stemYTop + stemHeight;
+                        g2.setStroke(new BasicStroke(Math.max(2f, scale)));
+                        g2.setColor(new Color(0, 0, 0, 160));
+                        g2.drawLine(stemX, stemYTop, stemX, stemYBottom);
+
+                        // Draw pin head (circle)
                         g2.setColor(m.color);
                         g2.fillOval(drawX - r, drawY - r, d, d);
-                        // Marker border
+
+                        // Pin border / highlight based on state
                         if (i == selectedMarkerIndex) {
                             g2.setColor(Color.YELLOW);
                         } else if (i == hoveredMarkerIndex) {
@@ -2089,10 +2148,10 @@ public class PdfViewerComponent extends JPanel {
                         } else {
                             g2.setColor(Color.WHITE);
                         }
-                        g2.setStroke(new BasicStroke(Math.max(1f, scale)));
+                        g2.setStroke(new BasicStroke(Math.max(1.5f, scale)));
                         g2.drawOval(drawX - r, drawY - r, d, d);
 
-                        // Draw text label bubble if present
+                        // Text label bubble, like a placemark label
                         if (m.text != null && !m.text.isEmpty()) {
                             String text = m.text;
                             if (m.createdBy != null && !m.createdBy.isEmpty()) {
@@ -2104,10 +2163,18 @@ public class PdfViewerComponent extends JPanel {
                             int pad = 6;
                             int tw = fm.stringWidth(text);
                             int th = fm.getHeight();
-                            int bx = drawX + r + 8;
+
+                            // Place label slightly above and to the right of the pin
+                            int bx = drawX + r + 10;
                             int by = drawY - th / 2;
-                            Shape bubble = new Rectangle2D.Float(bx - pad, by - pad + fm.getAscent() - th, tw + pad * 2, th + pad);
-                            g2.setColor(new Color(0, 0, 0, 140));
+
+                            Shape bubble = new Rectangle2D.Float(
+                                bx - pad,
+                                by - pad + fm.getAscent() - th,
+                                tw + pad * 2,
+                                th + pad
+                            );
+                            g2.setColor(new Color(0, 0, 0, 180));
                             g2.fill(bubble);
                             g2.setColor(Color.WHITE);
                             g2.drawString(text, bx, by);
