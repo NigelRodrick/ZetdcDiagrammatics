@@ -75,10 +75,11 @@ public class PdfRenderer {
             throw e;
         } catch (Exception e) {
             String msg = e.getMessage();
-            if (msg != null && msg.contains("password")) {
+            if (msg == null) msg = e.getClass().getSimpleName();
+            if (msg.contains("password")) {
                 throw new IOException("PDF is password-protected. Please remove the password first.");
             }
-            if (msg != null && (msg.contains("corrupt") || msg.contains("Invalid"))) {
+            if (msg.contains("corrupt") || msg.contains("Invalid")) {
                 throw new IOException("PDF may be corrupted or use an unsupported format: " + msg);
             }
             throw new IOException("Failed to render PDF page: " + msg);

@@ -28,6 +28,9 @@ import java.io.IOException;
  * Component for displaying PDF pages as images
  */
 public class PdfViewerComponent extends JPanel {
+
+    /** Constant marker radius (pixels) for on-screen and exported PDF so all markers look the same size. */
+    public static final int MARKER_RADIUS_PX = 8;
     
     private File currentPdfFile;
     private int currentPage = 1;
@@ -40,7 +43,9 @@ public class PdfViewerComponent extends JPanel {
     private boolean isPanning = false;
     private Point lastMousePosition;
     private Point imageOffset = new Point(0, 0);
-    
+    /** When set, applied to imageOffset when the next page image load completes (e.g. after zoom on TV). */
+    private Point pendingImageOffsetAfterLoad = null;
+
     // Touch screen support variables (enabled for TV and touch laptops)
     private boolean touchEnabled = TvMode.TOUCH_ENABLED;
     private Point touchStartPoint = null;
@@ -100,12 +105,14 @@ public class PdfViewerComponent extends JPanel {
         String text;
         Color color; // marker color
         String createdBy; // username of creator
+        float baseRadius; // logical radius in "zoom 1.0" units so markers scale nicely
         
         Marker(Point2D.Float position, String text) {
             this.position = position;
             this.text = text;
             this.color = new Color(255, 0, 0, 220); // default bright red color
             this.createdBy = null;
+            this.baseRadius = 8f;
         }
         
         Marker(Point2D.Float position, String text, Color color) {
@@ -113,6 +120,7 @@ public class PdfViewerComponent extends JPanel {
             this.text = text;
             this.color = color;
             this.createdBy = null;
+            this.baseRadius = 8f;
         }
 
         Marker(Point2D.Float position, String text, Color color, String createdBy) {
@@ -120,6 +128,7 @@ public class PdfViewerComponent extends JPanel {
             this.text = text;
             this.color = color;
             this.createdBy = createdBy;
+            this.baseRadius = 8f;
         }
     }
     private final Map<Integer, List<Marker>> pageIndexToMarkers = new HashMap<>();
@@ -439,6 +448,9 @@ public class PdfViewerComponent extends JPanel {
         imageCanvas.addMouseWheelListener(new MouseWheelListener() {
             @Override
             public void mouseWheelMoved(MouseWheelEvent e) {
+                // Re-enable wheel-based zooming: scroll up = zoom in, scroll down = zoom out.
+                // We keep left-drag panning disabled so markers stay visually stable.
+
                 // Disable zoom while a polyline is being constructed,
                 // to keep in-progress lines visually stable.
                 if (lineToggleButton.isSelected() &&
@@ -641,12 +653,9 @@ public class PdfViewerComponent extends JPanel {
                         return;
                     }
 
-                    // Otherwise start panning (disabled during edit-position)
-                    if (!isEditingMarkerPosition) {
-                        isPanning = true;
-                        lastMousePosition = e.getPoint();
-                        imageCanvas.setCursor(new Cursor(Cursor.MOVE_CURSOR));
-                    }
+                    // Otherwise, we no longer start panning with left-click drag.
+                    // Map movement should be done via scrollbars or mouse wheel only
+                    // to avoid shifting marker positions visually.
                 }
             }
             
@@ -719,14 +728,8 @@ public class PdfViewerComponent extends JPanel {
                     constructingPolylinePoints != null &&
                     !constructingPolylinePoints.isEmpty();
 
-                if (isPanning && lastMousePosition != null && !blockingPolylineInProgress) {
-                    int dx = e.getX() - lastMousePosition.x;
-                    int dy = e.getY() - lastMousePosition.y;
-                    imageOffset.x += dx;
-                    imageOffset.y += dy;
-                    lastMousePosition = e.getPoint();
-                    imageCanvas.repaint();
-                }
+                // Drag-panning via left mouse button is disabled; movement is via
+                // scrollbars or mouse wheel only to keep markers visually stable.
                 if (isDraggingMarker && selectedMarkerIndex != -1) {
                     List<Marker> markers = pageIndexToMarkers.get(currentPage);
                     if (markers != null && selectedMarkerIndex < markers.size()) {
@@ -946,11 +949,11 @@ public class PdfViewerComponent extends JPanel {
                 float scaleFactor = currentDistance / initialPinchDistance;
                 float newScale = initialScale * scaleFactor;
                 
-                // Limit zoom range
+                // Limit zoom range - re-render page at new scale so markers stay fixed (no drift)
                 if (newScale >= 0.1f && newScale <= 5.0f) {
                     scale = newScale;
                     clearImageCache();
-                    throttledRepaint();
+                    loadCurrentPage();
                 }
             }
         }
@@ -1422,19 +1425,37 @@ public class PdfViewerComponent extends JPanel {
         // Show loading indicator
         pageLabel.setText("Rendering page " + currentPage + "...");
         
+        // Capture snapshot so zoom/close during render doesn't pass null or wrong page
+        final File fileToRender = currentPdfFile;
+        final int pageToRender = currentPage;
+        final float scaleToRender = scale;
+        if (fileToRender == null || !fileToRender.exists()) {
+            pageLabel.setText("Page " + currentPage + " of " + totalPages);
+            return;
+        }
+        
         // Render in background thread to avoid blocking UI
         new Thread(() -> {
             try {
-                BufferedImage renderedImage = PdfRenderer.renderPage(currentPdfFile, currentPage, scale);
+                BufferedImage renderedImage = PdfRenderer.renderPage(fileToRender, pageToRender, scaleToRender);
                 
-                // Update UI on EDT
+                // Update UI on EDT only if this render is still current (no new zoom/page change)
                 SwingUtilities.invokeLater(() -> {
+                    if (currentPdfFile != fileToRender || currentPage != pageToRender || scale != scaleToRender) {
+                        return;
+                    }
                     currentPageImage = renderedImage;
                     
                     // Cache the rendered image
                     cachedPageImage = currentPageImage;
                     cachedPage = currentPage;
                     cachedScale = scale;
+                    // Apply any pan offset requested during zoom so markers and PDF stay in sync
+                    if (pendingImageOffsetAfterLoad != null) {
+                        imageOffset.x = pendingImageOffsetAfterLoad.x;
+                        imageOffset.y = pendingImageOffsetAfterLoad.y;
+                        pendingImageOffsetAfterLoad = null;
+                    }
                     
                     updateImageDisplay();
                     updatePageLabel();
@@ -1445,8 +1466,11 @@ public class PdfViewerComponent extends JPanel {
                     }
                 });
             } catch (IOException e) {
+                String errMsg = e.getMessage();
+                if (errMsg == null) errMsg = "Unknown error";
+                final String msg = errMsg;
                 SwingUtilities.invokeLater(() -> {
-                    showError("Error rendering page: " + e.getMessage());
+                    showError("Error rendering page: " + msg);
                 });
             }
         }).start();
@@ -1462,6 +1486,11 @@ public class PdfViewerComponent extends JPanel {
     }
     
     private void updateImageDisplay() {
+        // On laptop (no TV mode), keep pan offset at zero so PDF and markers always move together via scrollbars only
+        if (!TvMode.ENABLED) {
+            imageOffset.x = 0;
+            imageOffset.y = 0;
+        }
         if (currentPageImage != null) {
             // Update canvas preferred size to the scaled image size (panning handled via offset)
             imageCanvas.setPreferredSize(new Dimension(
@@ -1526,15 +1555,20 @@ public class PdfViewerComponent extends JPanel {
         if (newScale == scale) return;
         scale = newScale;
 
-        // Re-render at new scale
-        loadCurrentPage();
+        // On TV, compute pan offset to apply when the new image is ready (keeps point under cursor)
+        if (TvMode.ENABLED) {
+            int newCanvasX = Math.round(preImageX * scale) + imageOffset.x;
+            int newCanvasY = Math.round(preImageY * scale) + imageOffset.y;
+            pendingImageOffsetAfterLoad = new Point(
+                imageOffset.x + (canvasPoint.x - newCanvasX),
+                imageOffset.y + (canvasPoint.y - newCanvasY)
+            );
+        } else {
+            pendingImageOffsetAfterLoad = null;
+        }
 
-        // Adjust pan so that the same image point stays under the cursor
-        int newCanvasX = Math.round(preImageX * scale) + imageOffset.x;
-        int newCanvasY = Math.round(preImageY * scale) + imageOffset.y;
-        imageOffset.x += (canvasPoint.x - newCanvasX);
-        imageOffset.y += (canvasPoint.y - newCanvasY);
-        updateImageDisplay();
+        // Re-render at new scale; display is updated only when new image is ready so markers never drift
+        loadCurrentPage();
     }
     
     public void fitToWidth() {
@@ -1737,11 +1771,17 @@ public class PdfViewerComponent extends JPanel {
         if (label == null) label = "";
 
         List<Marker> list = pageIndexToMarkers.computeIfAbsent(currentPage, k -> new ArrayList<>());
-        list.add(new Marker(pdfPoint, label, selectedColor, currentEditorUsername));
+        Marker newMarker = new Marker(pdfPoint, label, selectedColor, currentEditorUsername);
+        list.add(newMarker);
         selectedMarkerIndex = list.size() - 1;
         imageCanvas.repaint();
         notifyChangesMade();
-        
+
+        // One-marker-at-a-time: turn off marker mode after inserting
+        markerToggleButton.setSelected(false);
+        imageCanvas.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+        updateButtonStates();
+
         // Changes will be saved automatically when the application closes or file is switched
     }
     
@@ -2032,12 +2072,14 @@ public class PdfViewerComponent extends JPanel {
     private int hitTestMarker(Point canvasPoint) {
         List<Marker> markers = pageIndexToMarkers.get(currentPage);
         if (markers == null || markers.isEmpty()) return -1;
-        int base = Math.max(8, Math.round(8 * scale));
+        int drawOx = TvMode.ENABLED ? imageOffset.x : 0;
+        int drawOy = TvMode.ENABLED ? imageOffset.y : 0;
+        final int hitRadiusPx = Math.max(MARKER_RADIUS_PX + 4, 12); // hit area for constant-size markers
         for (int i = markers.size() - 1; i >= 0; i--) { // topmost first
             Marker m = markers.get(i);
-            int cx = Math.round(m.position.x * scale) + imageOffset.x;
-            int cy = Math.round(m.position.y * scale) + imageOffset.y;
-            int r = base + ((isEditingMarkerPosition && i == selectedMarkerIndex) ? 6 : 0);
+            int cx = Math.round(m.position.x * scale) + drawOx;
+            int cy = Math.round(m.position.y * scale) + drawOy;
+            int r = hitRadiusPx + ((isEditingMarkerPosition && i == selectedMarkerIndex) ? 6 : 0);
             int dx = canvasPoint.x - cx;
             int dy = canvasPoint.y - cy;
             if ((dx * dx + dy * dy) <= r * r) return i;
@@ -2104,43 +2146,43 @@ public class PdfViewerComponent extends JPanel {
                     return;
                 }
 
-                // Draw page image with pan offset
-                g2.drawImage(currentPageImage, imageOffset.x, imageOffset.y, null);
+                // On laptop use (0,0) so PDF and markers always move together; on TV use pan offset
+                int drawOx = TvMode.ENABLED ? imageOffset.x : 0;
+                int drawOy = TvMode.ENABLED ? imageOffset.y : 0;
 
-                // Draw markers for current page, scaled and panned (Google Earth style pins)
+                // Draw page image with pan offset
+                g2.drawImage(currentPageImage, drawOx, drawOy, null);
+
+                // Draw markers for current page, scaled with zoom (colored points)
                 List<Marker> markers = pageIndexToMarkers.get(currentPage);
                 if (markers != null && !markers.isEmpty()) {
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     for (int i = 0; i < markers.size(); i++) {
                         Marker m = markers.get(i);
-                        int drawX = Math.round(m.position.x * scale) + imageOffset.x;
-                        int drawY = Math.round(m.position.y * scale) + imageOffset.y;
+                        int drawX = Math.round(m.position.x * scale) + drawOx;
+                        int drawY = Math.round(m.position.y * scale) + drawOy;
 
-                        // Base sizes scaled with zoom
-                        int pinRadius = Math.max(6, Math.round(6 * scale));
-                        int stemHeight = Math.max(10, Math.round(12 * scale));
-
-                        // Wobble effect while moving a marker
-                        int wobble = (isEditingMarkerPosition && i == selectedMarkerIndex)
-                            ? (int) Math.round(Math.max(1, scale) * (2 + ((System.currentTimeMillis() / 120) % 3)))
-                            : 0;
-
-                        int r = pinRadius + wobble;
+                        // Constant on-screen radius so all markers look the same size at any zoom
+                        int r = MARKER_RADIUS_PX;
                         int d = r * 2;
 
-                        // Draw stem (pin tail)
-                        int stemX = drawX;
-                        int stemYTop = drawY + r;
-                        int stemYBottom = stemYTop + stemHeight;
-                        g2.setStroke(new BasicStroke(Math.max(2f, scale)));
-                        g2.setColor(new Color(0, 0, 0, 160));
-                        g2.drawLine(stemX, stemYTop, stemX, stemYBottom);
+                        // Intensify marker color slightly for better visibility,
+                        // especially for reds and greens.
+                        Color baseColor = (m.color != null) ? m.color : Color.RED;
+                        Color drawColor;
+                        if (Color.RED.equals(baseColor)) {
+                            drawColor = new Color(220, 0, 0);      // brighter red
+                        } else if (Color.GREEN.equals(baseColor)) {
+                            drawColor = new Color(0, 200, 0);      // brighter green
+                        } else {
+                            drawColor = baseColor;
+                        }
 
-                        // Draw pin head (circle)
-                        g2.setColor(m.color);
+                        // Draw colored circle as the marker point
+                        g2.setColor(drawColor);
                         g2.fillOval(drawX - r, drawY - r, d, d);
 
-                        // Pin border / highlight based on state
+                        // Border / highlight based on state (stroke also scales mildly with zoom)
                         if (i == selectedMarkerIndex) {
                             g2.setColor(Color.YELLOW);
                         } else if (i == hoveredMarkerIndex) {
@@ -2148,7 +2190,7 @@ public class PdfViewerComponent extends JPanel {
                         } else {
                             g2.setColor(Color.WHITE);
                         }
-                        g2.setStroke(new BasicStroke(Math.max(1.5f, scale)));
+                        g2.setStroke(new BasicStroke(Math.max(1.2f, scale)));
                         g2.drawOval(drawX - r, drawY - r, d, d);
 
                         // Text label bubble, like a placemark label
@@ -2203,15 +2245,15 @@ public class PdfViewerComponent extends JPanel {
                         switch (ln.type) {
                             case POLYLINE:
                             case STRAIGHT_LINE:
-                                int x1 = Math.round(ln.start.x * scale) + imageOffset.x;
-                                int y1 = Math.round(ln.start.y * scale) + imageOffset.y;
-                                int x2 = Math.round(ln.end.x * scale) + imageOffset.x;
-                                int y2 = Math.round(ln.end.y * scale) + imageOffset.y;
+                                int x1 = Math.round(ln.start.x * scale) + drawOx;
+                                int y1 = Math.round(ln.start.y * scale) + drawOy;
+                                int x2 = Math.round(ln.end.x * scale) + drawOx;
+                                int y2 = Math.round(ln.end.y * scale) + drawOy;
                                 g2.drawLine(x1, y1, x2, y2);
                                 break;
                             case CIRCLE:
-                                int centerX = Math.round(ln.start.x * scale) + imageOffset.x;
-                                int centerY = Math.round(ln.start.y * scale) + imageOffset.y;
+                                int centerX = Math.round(ln.start.x * scale) + drawOx;
+                                int centerY = Math.round(ln.start.y * scale) + drawOy;
                                 int radius = Math.round(ln.radius * scale);
                                 g2.drawOval(centerX - radius, centerY - radius, radius * 2, radius * 2);
                                 break;
@@ -2228,11 +2270,11 @@ public class PdfViewerComponent extends JPanel {
                             int pad = 6;
                             int midX, midY;
                             if (ln.type == LineType.CIRCLE) {
-                                midX = Math.round(ln.start.x * scale) + imageOffset.x;
-                                midY = Math.round(ln.start.y * scale) + imageOffset.y;
+                                midX = Math.round(ln.start.x * scale) + drawOx;
+                                midY = Math.round(ln.start.y * scale) + drawOy;
                             } else {
-                                midX = (Math.round(ln.start.x * scale) + Math.round(ln.end.x * scale)) / 2 + imageOffset.x;
-                                midY = (Math.round(ln.start.y * scale) + Math.round(ln.end.y * scale)) / 2 + imageOffset.y;
+                                midX = (Math.round(ln.start.x * scale) + Math.round(ln.end.x * scale)) / 2 + drawOx;
+                                midY = (Math.round(ln.start.y * scale) + Math.round(ln.end.y * scale)) / 2 + drawOy;
                             }
                             int tw = fm.stringWidth(text);
                             int th = fm.getHeight();
@@ -2256,17 +2298,17 @@ public class PdfViewerComponent extends JPanel {
                     for (int i = 1; i < constructingPolylinePoints.size(); i++) {
                         Point2D.Float a = constructingPolylinePoints.get(i - 1);
                         Point2D.Float b = constructingPolylinePoints.get(i);
-                        int x1 = Math.round(a.x * scale) + imageOffset.x;
-                        int y1 = Math.round(a.y * scale) + imageOffset.y;
-                        int x2 = Math.round(b.x * scale) + imageOffset.x;
-                        int y2 = Math.round(b.y * scale) + imageOffset.y;
+                        int x1 = Math.round(a.x * scale) + drawOx;
+                        int y1 = Math.round(a.y * scale) + drawOy;
+                        int x2 = Math.round(b.x * scale) + drawOx;
+                        int y2 = Math.round(b.y * scale) + drawOy;
                         g2.drawLine(x1, y1, x2, y2);
                     }
                     // trailing segment to last known mouse position
                     if (lastMousePosition != null) {
                         Point2D.Float last = constructingPolylinePoints.get(constructingPolylinePoints.size() - 1);
-                        int x1 = Math.round(last.x * scale) + imageOffset.x;
-                        int y1 = Math.round(last.y * scale) + imageOffset.y;
+                        int x1 = Math.round(last.x * scale) + drawOx;
+                        int y1 = Math.round(last.y * scale) + drawOy;
                         g2.drawLine(x1, y1, lastMousePosition.x, lastMousePosition.y);
                     }
                 }
@@ -2275,8 +2317,8 @@ public class PdfViewerComponent extends JPanel {
                 if (lineToggleButton.isSelected() && currentLineType == LineType.STRAIGHT_LINE && straightLineStart != null && lastMousePosition != null) {
                     g2.setColor(new Color(255, 0, 0, 170));
                     g2.setStroke(new BasicStroke(Math.max(1.5f, scale), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    int x1 = Math.round(straightLineStart.x * scale) + imageOffset.x;
-                    int y1 = Math.round(straightLineStart.y * scale) + imageOffset.y;
+                    int x1 = Math.round(straightLineStart.x * scale) + drawOx;
+                    int y1 = Math.round(straightLineStart.y * scale) + drawOy;
                     g2.drawLine(x1, y1, lastMousePosition.x, lastMousePosition.y);
                 }
                 
@@ -2284,8 +2326,8 @@ public class PdfViewerComponent extends JPanel {
                 if (lineToggleButton.isSelected() && currentLineType == LineType.CIRCLE && circleCenter != null && lastMousePosition != null) {
                     g2.setColor(new Color(255, 0, 0, 170));
                     g2.setStroke(new BasicStroke(Math.max(1.5f, scale), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    int centerX = Math.round(circleCenter.x * scale) + imageOffset.x;
-                    int centerY = Math.round(circleCenter.y * scale) + imageOffset.y;
+                    int centerX = Math.round(circleCenter.x * scale) + drawOx;
+                    int centerY = Math.round(circleCenter.y * scale) + drawOy;
                     float radius = (float) Math.sqrt(
                         Math.pow(lastMousePosition.x - centerX, 2) + 
                         Math.pow(lastMousePosition.y - centerY, 2)
@@ -2304,8 +2346,8 @@ public class PdfViewerComponent extends JPanel {
                     
                     for (int i = 0; i < texts.size(); i++) {
                         TextAnnotation text = texts.get(i);
-                        int drawX = Math.round(text.position.x * scale) + imageOffset.x;
-                        int drawY = Math.round(text.position.y * scale) + imageOffset.y;
+                        int drawX = Math.round(text.position.x * scale) + drawOx;
+                        int drawY = Math.round(text.position.y * scale) + drawOy;
                         
                         // Draw text background
                         String displayText = text.text;

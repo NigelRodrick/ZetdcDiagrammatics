@@ -1,0 +1,21 @@
+cd /d "C:\Users\ZE9025343\Desktop\TV-Install"
+dir
+
+
+
+run-tv.bat
+
+
+
+Open a browser and go to: https://adoptium.net/temurin/releases/
+Choose:
+Operating system: Windows
+Architecture: x64
+Version: 17 (or 11+)
+Download the JRE or JDK installer (MSI/EXE).
+Run the installer and accept defaults (it will add java to PATH).
+Close Command Prompt, open a new one, and run:
+
+
+   cd /d "C:\Users\ZE9025343\Desktop\TV-Install"
+   run-tv.bat

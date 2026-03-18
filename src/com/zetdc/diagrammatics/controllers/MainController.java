@@ -1985,10 +1985,11 @@ public class MainController {
             List<PdfViewerComponent.MarkerDTO> pageMarkers =
                 markers != null ? markers.get(pageKey) : null;
             if (pageMarkers != null) {
+                int markerR = PdfViewerComponent.MARKER_RADIUS_PX; // same size as on-screen, all markers equal in saved PDF
                 for (PdfViewerComponent.MarkerDTO m : pageMarkers) {
                     int cx = Math.round(m.x);
                     int cy = Math.round(m.y);
-                    int r = 8;
+                    int r = markerR;
                     int d = r * 2;
                     Color color = new Color(m.colorRgb, true);
                     g2.setColor(color);

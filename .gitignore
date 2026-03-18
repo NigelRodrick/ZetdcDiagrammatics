@@ -16,3 +16,9 @@ hs_err_pid*.log
 Thumbs.db
 Desktop.ini
 
+
+## Local install artifacts
+/FinalInstallation/
+/TV-Install/
+/Laptop-Install/
+*.msi
