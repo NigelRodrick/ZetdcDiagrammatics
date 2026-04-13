@@ -2074,7 +2074,7 @@ public class PdfViewerComponent extends JPanel {
         if (markers == null || markers.isEmpty()) return -1;
         int drawOx = TvMode.ENABLED ? imageOffset.x : 0;
         int drawOy = TvMode.ENABLED ? imageOffset.y : 0;
-        final int hitRadiusPx = Math.max(MARKER_RADIUS_PX + 4, 12); // hit area for constant-size markers
+        final int hitRadiusPx = Math.max(MARKER_RADIUS_PX + Math.round(6f * getOverlayVisibilityBoost()), 14);
         for (int i = markers.size() - 1; i >= 0; i--) { // topmost first
             Marker m = markers.get(i);
             int cx = Math.round(m.position.x * scale) + drawOx;
@@ -2092,17 +2092,19 @@ public class PdfViewerComponent extends JPanel {
         if (texts == null || texts.isEmpty()) return -1;
         
         Font baseFont = imageCanvas.getFont();
-        Font textFont = baseFont.deriveFont(Math.max(10f, 12f * Math.min(1.0f, scale)));
+        Font textFont = baseFont.deriveFont(getOverlayFontSize());
         FontMetrics fm = imageCanvas.getFontMetrics(textFont);
+        int drawOx = TvMode.ENABLED ? imageOffset.x : 0;
+        int drawOy = TvMode.ENABLED ? imageOffset.y : 0;
         
         for (int i = texts.size() - 1; i >= 0; i--) { // topmost first
             TextAnnotation text = texts.get(i);
-            int drawX = Math.round(text.position.x * scale) + imageOffset.x;
-            int drawY = Math.round(text.position.y * scale) + imageOffset.y;
+            int drawX = Math.round(text.position.x * scale) + drawOx;
+            int drawY = Math.round(text.position.y * scale) + drawOy;
             
             int textWidth = fm.stringWidth(text.text);
             int textHeight = fm.getHeight();
-            int padding = Math.max(4, Math.round(4 * scale));
+            int padding = getOverlayPadding();
             
             int left = drawX - padding;
             int top = drawY - textHeight + fm.getAscent() - padding;
@@ -2125,6 +2127,55 @@ public class PdfViewerComponent extends JPanel {
             return null;
         }
         return new Point2D.Float(imageX, imageY);
+    }
+
+    private float getOverlayVisibilityBoost() {
+        float boost = (scale >= 1.0f) ? 1.0f : Math.min(2.2f, 1.0f + ((1.0f - scale) * 1.2f));
+        int overlayCount = getCurrentPageOverlayCount();
+        if (scale < 0.45f && overlayCount > 30) {
+            float zoomPressure = Math.min(1.0f, (0.45f - scale) / 0.30f);
+            float densityPressure = Math.min(1.0f, (overlayCount - 30) / 80f);
+            float crowding = zoomPressure * densityPressure;
+            boost *= (1.0f - (0.40f * crowding));
+        }
+        return Math.max(0.85f, boost);
+    }
+
+    private float getOverlayFontSize() {
+        return Math.max(11f, 12f * getOverlayVisibilityBoost());
+    }
+
+    private int getOverlayPadding() {
+        return Math.max(6, Math.round(6f * getOverlayVisibilityBoost()));
+    }
+
+    private int getCurrentPageOverlayCount() {
+        int markerCount = 0;
+        int lineCount = 0;
+        int textCount = 0;
+        List<Marker> markers = pageIndexToMarkers.get(currentPage);
+        List<Line> lines = pageIndexToLines.get(currentPage);
+        List<TextAnnotation> texts = pageIndexToTexts.get(currentPage);
+        if (markers != null) markerCount = markers.size();
+        if (lines != null) lineCount = lines.size();
+        if (texts != null) textCount = texts.size();
+        return markerCount + lineCount + textCount;
+    }
+
+    private float getOverlayAlpha(int overlayCount) {
+        if (scale >= 0.45f || overlayCount < 25) return 1.0f;
+        float zoomPressure = Math.min(1.0f, (0.45f - scale) / 0.30f);
+        float densityPressure = Math.min(1.0f, (overlayCount - 25) / 80f);
+        float fade = zoomPressure * densityPressure;
+        return Math.max(0.40f, 1.0f - (0.55f * fade));
+    }
+
+    private boolean shouldRenderOverlayLabel(int index, int overlayCount) {
+        if (scale >= 0.40f || overlayCount < 35) return true;
+        float zoomPressure = Math.min(1.0f, (0.40f - scale) / 0.25f);
+        float densityPressure = Math.min(1.0f, (overlayCount - 35) / 90f);
+        int stride = 1 + Math.round(zoomPressure * 2f) + Math.round(densityPressure * 2f);
+        return index % Math.max(1, stride) == 0;
     }
 
     // Canvas component that draws the current page and overlay markers
@@ -2152,6 +2203,8 @@ public class PdfViewerComponent extends JPanel {
 
                 // Draw page image with pan offset
                 g2.drawImage(currentPageImage, drawOx, drawOy, null);
+                int overlayCount = getCurrentPageOverlayCount();
+                float overlayAlpha = getOverlayAlpha(overlayCount);
 
                 // Draw markers for current page, scaled with zoom (colored points)
                 List<Marker> markers = pageIndexToMarkers.get(currentPage);
@@ -2163,7 +2216,7 @@ public class PdfViewerComponent extends JPanel {
                         int drawY = Math.round(m.position.y * scale) + drawOy;
 
                         // Constant on-screen radius so all markers look the same size at any zoom
-                        int r = MARKER_RADIUS_PX;
+                        int r = Math.max(MARKER_RADIUS_PX, Math.round(MARKER_RADIUS_PX * getOverlayVisibilityBoost()));
                         int d = r * 2;
 
                         // Intensify marker color slightly for better visibility,
@@ -2179,6 +2232,7 @@ public class PdfViewerComponent extends JPanel {
                         }
 
                         // Draw colored circle as the marker point
+                        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, overlayAlpha));
                         g2.setColor(drawColor);
                         g2.fillOval(drawX - r, drawY - r, d, d);
 
@@ -2194,15 +2248,15 @@ public class PdfViewerComponent extends JPanel {
                         g2.drawOval(drawX - r, drawY - r, d, d);
 
                         // Text label bubble, like a placemark label
-                        if (m.text != null && !m.text.isEmpty()) {
+                        if (m.text != null && !m.text.isEmpty() && shouldRenderOverlayLabel(i, overlayCount)) {
                             String text = m.text;
                             if (m.createdBy != null && !m.createdBy.isEmpty()) {
                                 text = text + "  (" + m.createdBy + ")";
                             }
                             Font base = g2.getFont();
-                            g2.setFont(base.deriveFont(Math.max(10f, 12f * Math.min(1.0f, scale))));
+                            g2.setFont(base.deriveFont(getOverlayFontSize()));
                             FontMetrics fm = g2.getFontMetrics();
-                            int pad = 6;
+                            int pad = getOverlayPadding();
                             int tw = fm.stringWidth(text);
                             int th = fm.getHeight();
 
@@ -2221,6 +2275,7 @@ public class PdfViewerComponent extends JPanel {
                             g2.setColor(Color.WHITE);
                             g2.drawString(text, bx, by);
                         }
+                        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
                     }
                 }
 
@@ -2230,6 +2285,7 @@ public class PdfViewerComponent extends JPanel {
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     for (int i = 0; i < lines.size(); i++) {
                         Line ln = lines.get(i);
+                        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, overlayAlpha));
                         
                         // Set color and stroke based on selection and hover state
                         if (i == selectedLineIndex) {
@@ -2259,15 +2315,15 @@ public class PdfViewerComponent extends JPanel {
                                 break;
                         }
                         // draw text near midpoint if present
-                        if (ln.text != null && !ln.text.isEmpty()) {
+                        if (ln.text != null && !ln.text.isEmpty() && shouldRenderOverlayLabel(i, overlayCount)) {
                             String text = ln.text;
                             if (ln.createdBy != null && !ln.createdBy.isEmpty()) {
                                 text = text + "  (" + ln.createdBy + ")";
                             }
                             Font base = g2.getFont();
-                            g2.setFont(base.deriveFont(Math.max(10f, 12f * Math.min(1.0f, scale))));
+                            g2.setFont(base.deriveFont(getOverlayFontSize()));
                             FontMetrics fm = g2.getFontMetrics();
-                            int pad = 6;
+                            int pad = getOverlayPadding();
                             int midX, midY;
                             if (ln.type == LineType.CIRCLE) {
                                 midX = Math.round(ln.start.x * scale) + drawOx;
@@ -2286,6 +2342,7 @@ public class PdfViewerComponent extends JPanel {
                             g2.setColor(Color.RED);
                             g2.setStroke(new BasicStroke(Math.max(2f, scale), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                         }
+                        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
                     }
                 }
 
@@ -2340,12 +2397,13 @@ public class PdfViewerComponent extends JPanel {
                 if (texts != null && !texts.isEmpty()) {
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     Font baseFont = g2.getFont();
-                    Font textFont = baseFont.deriveFont(Math.max(10f, 12f * Math.min(1.0f, scale)));
+                    Font textFont = baseFont.deriveFont(getOverlayFontSize());
                     g2.setFont(textFont);
                     FontMetrics fm = g2.getFontMetrics();
                     
                     for (int i = 0; i < texts.size(); i++) {
                         TextAnnotation text = texts.get(i);
+                        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, overlayAlpha));
                         int drawX = Math.round(text.position.x * scale) + drawOx;
                         int drawY = Math.round(text.position.y * scale) + drawOy;
                         
@@ -2356,31 +2414,35 @@ public class PdfViewerComponent extends JPanel {
                         }
                         int textWidth = fm.stringWidth(displayText);
                         int textHeight = fm.getHeight();
-                        int padding = Math.max(4, Math.round(4 * scale));
+                        int padding = getOverlayPadding();
+                        int cornerRadius = Math.max(6, Math.round(6f * getOverlayVisibilityBoost()));
                         
                         g2.setColor(text.backgroundColor);
                         g2.fillRoundRect(drawX - padding, drawY - textHeight + fm.getAscent() - padding, 
                                         textWidth + 2 * padding, textHeight + 2 * padding, 
-                                        Math.max(4, Math.round(4 * scale)), Math.max(4, Math.round(4 * scale)));
+                                        cornerRadius, cornerRadius);
                         
                         // Draw text border if selected or hovered
                         if (i == selectedTextIndex) {
                             g2.setColor(Color.BLUE);
-                            g2.setStroke(new BasicStroke(Math.max(2f, scale)));
+                            g2.setStroke(new BasicStroke(Math.max(2f, 1.5f * getOverlayVisibilityBoost())));
                             g2.drawRoundRect(drawX - padding, drawY - textHeight + fm.getAscent() - padding, 
                                            textWidth + 2 * padding, textHeight + 2 * padding, 
-                                           Math.max(4, Math.round(4 * scale)), Math.max(4, Math.round(4 * scale)));
+                                           cornerRadius, cornerRadius);
                         } else if (i == hoveredTextIndex) {
                             g2.setColor(Color.CYAN); // Highlight on hover
-                            g2.setStroke(new BasicStroke(Math.max(2f, scale)));
+                            g2.setStroke(new BasicStroke(Math.max(2f, 1.5f * getOverlayVisibilityBoost())));
                             g2.drawRoundRect(drawX - padding, drawY - textHeight + fm.getAscent() - padding, 
                                            textWidth + 2 * padding, textHeight + 2 * padding, 
-                                           Math.max(4, Math.round(4 * scale)), Math.max(4, Math.round(4 * scale)));
+                                           cornerRadius, cornerRadius);
                         }
                         
                         // Draw text
                         g2.setColor(Color.BLACK);
-                        g2.drawString(displayText, drawX, drawY);
+                        if (shouldRenderOverlayLabel(i, overlayCount)) {
+                            g2.drawString(displayText, drawX, drawY);
+                        }
+                        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
                     }
                 }
             } finally {
