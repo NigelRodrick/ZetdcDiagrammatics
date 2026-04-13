@@ -51,6 +51,7 @@ jobs:
             --input build\libs `
             --main-jar zetdcschemmatics-fat.jar `
             --main-class com.zetdc.diagrammatics.Main `
+            --icon zetdcschemmatics.ico `
             --vendor "ZETDC Southern Region" `
             --win-shortcut `
             --win-menu `
