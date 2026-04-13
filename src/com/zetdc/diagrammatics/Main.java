@@ -8,6 +8,8 @@ import com.zetdc.diagrammatics.utils.UserService;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.nio.file.Paths;
 import java.io.InputStream;
 
 /**
@@ -110,16 +112,19 @@ public class Main {
                 "/logo.png",
                 "/logo.jpg", 
                 "/logo.jpeg",
+                "/logo.jfif",
                 "/logo.gif",
                 "/logo.bmp",
                 "/resources/logo.png",
                 "/resources/logo.jpg",
                 "/resources/logo.jpeg", 
+                "/resources/logo.jfif",
                 "/resources/logo.gif",
                 "/resources/logo.bmp",
                 "/images/logo.png",
                 "/images/logo.jpg",
                 "/images/logo.jpeg",
+                "/images/logo.jfif",
                 "/images/logo.gif",
                 "/images/logo.bmp"
             };
@@ -131,6 +136,25 @@ public class Main {
                     logoStream.close();
                     System.out.println("Logo loaded from: " + logoPath);
                     return new ImageIcon(logoBytes);
+                }
+            }
+
+            // Fallback: load from local files (project folder or app working directory)
+            String[] fileCandidates = {
+                "logo.jfif",
+                "logo.jpeg",
+                "logo.jpg",
+                "logo.png",
+                Paths.get("src", "resources", "logo.jfif").toString(),
+                Paths.get("src", "resources", "logo.jpeg").toString(),
+                Paths.get("src", "resources", "logo.jpg").toString(),
+                Paths.get("src", "resources", "logo.png").toString()
+            };
+            for (String candidate : fileCandidates) {
+                File file = new File(candidate);
+                if (file.exists() && file.isFile()) {
+                    System.out.println("Logo loaded from file: " + file.getAbsolutePath());
+                    return new ImageIcon(file.getAbsolutePath());
                 }
             }
         } catch (Exception e) {

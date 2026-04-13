@@ -2233,16 +2233,19 @@ public class MainController {
                 "/logo.png",
                 "/logo.jpg", 
                 "/logo.jpeg",
+                "/logo.jfif",
                 "/logo.gif",
                 "/logo.bmp",
                 "/resources/logo.png",
                 "/resources/logo.jpg",
                 "/resources/logo.jpeg", 
+                "/resources/logo.jfif",
                 "/resources/logo.gif",
                 "/resources/logo.bmp",
                 "/images/logo.png",
                 "/images/logo.jpg",
                 "/images/logo.jpeg",
+                "/images/logo.jfif",
                 "/images/logo.gif",
                 "/images/logo.bmp"
             };
@@ -2264,6 +2267,30 @@ public class MainController {
                     mainFrame.setIconImages(Arrays.asList(icon16, icon32, icon48));
                     
                     System.out.println("Application icon loaded from: " + logoPath);
+                    return;
+                }
+            }
+
+            // Fallback to filesystem logo files when not packaged as resources
+            String[] fileCandidates = {
+                "logo.jfif",
+                "logo.jpeg",
+                "logo.jpg",
+                "logo.png",
+                Paths.get("src", "resources", "logo.jfif").toString(),
+                Paths.get("src", "resources", "logo.jpeg").toString(),
+                Paths.get("src", "resources", "logo.jpg").toString(),
+                Paths.get("src", "resources", "logo.png").toString()
+            };
+            for (String candidate : fileCandidates) {
+                File file = new File(candidate);
+                if (file.exists() && file.isFile()) {
+                    Image logoImage = new ImageIcon(file.getAbsolutePath()).getImage();
+                    Image icon16 = logoImage.getScaledInstance(16, 16, Image.SCALE_SMOOTH);
+                    Image icon32 = logoImage.getScaledInstance(32, 32, Image.SCALE_SMOOTH);
+                    Image icon48 = logoImage.getScaledInstance(48, 48, Image.SCALE_SMOOTH);
+                    mainFrame.setIconImages(Arrays.asList(icon16, icon32, icon48));
+                    System.out.println("Application icon loaded from file: " + file.getAbsolutePath());
                     return;
                 }
             }
