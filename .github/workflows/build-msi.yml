@@ -1,4 +1,4 @@
-name: Build Windows installers
+name: Build Windows EXE
 
 on:
   workflow_dispatch:
@@ -44,27 +44,9 @@ jobs:
             --win-menu `
             --dest out
 
-      - name: Create MSI installer with jpackage
-        shell: pwsh
-        run: |
-          jpackage `
-            --type msi `
-            --name "ZetdcDiagrammatics" `
-            --app-version 1.0.0 `
-            --input build\libs `
-            --main-jar zetdcschemmatics-fat.jar `
-            --main-class com.zetdc.diagrammatics.Main `
-            --icon zetdcschemmatics.ico `
-            --vendor "ZETDC Southern Region" `
-            --win-shortcut `
-            --win-menu `
-            --dest out
-
-      - name: Upload EXE and MSI artifacts
+      - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ZetdcDiagrammatics-windows-installers
-          path: |
-            out\*.exe
-            out\*.msi
+          name: ZetdcDiagrammatics-exe
+          path: out\*.exe
 
