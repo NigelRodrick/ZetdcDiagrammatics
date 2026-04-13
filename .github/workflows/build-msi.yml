@@ -22,9 +22,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
       - name: Build fat JAR
         run: |
-          .\gradlew.bat fatJar
+          gradle fatJar
 
       - name: Create EXE installer with jpackage
         shell: pwsh
