@@ -1,0 +1,66 @@
+name: Build Windows installers
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-windows-installers:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build fat JAR
+        run: |
+          .\gradlew.bat fatJar
+
+      - name: Create EXE installer with jpackage
+        shell: pwsh
+        run: |
+          jpackage `
+            --type exe `
+            --name "ZetdcDiagrammatics" `
+            --app-version 1.0.0 `
+            --input build\libs `
+            --main-jar zetdcschemmatics-fat.jar `
+            --main-class com.zetdc.diagrammatics.Main `
+            --vendor "ZETDC Southern Region" `
+            --win-shortcut `
+            --win-menu `
+            --dest out
+
+      - name: Create MSI installer with jpackage
+        shell: pwsh
+        run: |
+          jpackage `
+            --type msi `
+            --name "ZetdcDiagrammatics" `
+            --app-version 1.0.0 `
+            --input build\libs `
+            --main-jar zetdcschemmatics-fat.jar `
+            --main-class com.zetdc.diagrammatics.Main `
+            --vendor "ZETDC Southern Region" `
+            --win-shortcut `
+            --win-menu `
+            --dest out
+
+      - name: Upload EXE and MSI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZetdcDiagrammatics-windows-installers
+          path: |
+            out\*.exe
+            out\*.msi
+

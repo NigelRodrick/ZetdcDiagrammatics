@@ -1,0 +1,190 @@
+plugins {
+    id 'application'
+}
+
+group = 'com.zetdc'
+
+// Use src/ as source root (Eclipse-style layout)
+sourceSets {
+    main {
+        java { srcDirs = ['src'] }
+    }
+}
+version = '1.0.0'
+description = 'ZetdcDiagrammatics - A modern desktop diagramming application'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // PDF processing library (2.0.30+ for better compatibility with various PDFs)
+    implementation 'org.apache.pdfbox:pdfbox:2.0.30'
+}
+
+application {
+    mainClass = 'com.zetdc.diagrammatics.Main'
+}
+
+// Fat JAR configuration for standalone executable
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'com.zetdc.diagrammatics.Main',
+            'Implementation-Title': project.name,
+            'Implementation-Version': project.version,
+            'Class-Path': '.'
+        )
+    }
+    
+    // Include all dependencies in the JAR
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
+    // Make it executable
+    archiveBaseName = 'zetdcschemmatics'
+    archiveVersion = ''
+}
+
+// Create a fat JAR task
+task fatJar(type: Jar) {
+    manifest {
+        attributes(
+            'Main-Class': 'com.zetdc.diagrammatics.Main',
+            'Implementation-Title': 'ZetdcDiagrammatics',
+            'Implementation-Version': '1.0.0'
+        )
+    }
+    
+    archiveBaseName = 'zetdcschemmatics'
+    archiveVersion = ''
+    archiveClassifier = 'fat'
+    
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    with jar
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Sync TV-Install and Laptop-Install folders with the latest fat JAR
+tasks.register('installTvLaptop') {
+    group = 'distribution'
+    description = 'Build fat JAR and refresh TV-Install and Laptop-Install folders'
+    dependsOn fatJar
+
+    doLast {
+        def jarFile = tasks.fatJar.archiveFile.get().asFile
+
+        // Ensure install folders exist
+        def tvDir = file('TV-Install')
+        def laptopDir = file('Laptop-Install')
+        if (!tvDir.exists()) tvDir.mkdirs()
+        if (!laptopDir.exists()) laptopDir.mkdirs()
+
+        // Copy updated JAR into both folders
+        copy {
+            from jarFile
+            into tvDir
+        }
+        copy {
+            from jarFile
+            into laptopDir
+        }
+
+        println "Updated TV-Install and Laptop-Install with ${jarFile.name}"
+    }
+}
+
+// Run configuration
+run {
+    // No special JVM args needed for Swing
+}
+
+// Test configuration
+test {
+    useJUnitPlatform()
+}
+
+// Build information
+tasks.named('compileJava') {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('compileTestJava') {
+    options.encoding = 'UTF-8'
+}
+
+// Distribution configuration
+distributions {
+    main {
+        distributionBaseName = 'zetdcschemmatics'
+        contents {
+            from('README.md') {
+                into '.'
+            }
+            from('src/resources') {
+                into 'resources'
+            }
+        }
+    }
+}
+
+// Copy resources to JAR
+processResources {
+    from('src/resources') {
+        into 'resources'
+    }
+}
+
+// Create shareable distribution - run: gradlew dist
+task dist(type: Copy, dependsOn: jar) {
+    description = 'Create distributable folder for sharing'
+    group = 'distribution'
+    
+    into layout.buildDirectory.dir("dist/zetdcschemmatics")
+    
+    from(jar) {
+        into '.'
+        rename { 'zetdcschemmatics.jar' }
+    }
+    from('run.bat') {
+        into '.'
+    }
+    if (file('README.md').exists()) {
+        from('README.md') { into '.' }
+    }
+    doLast {
+        def distDir = new File(layout.buildDirectory.get().asFile, "dist/zetdcschemmatics")
+        println ""
+        println "=========================================="
+        println "Shareable package created at:"
+        println "  ${distDir.absolutePath}"
+        println ""
+        println "To share: Zip the 'zetdcschemmatics' folder and send."
+        println "Recipients need Java 11+ installed. Double-click run.bat to start."
+        println "=========================================="
+    }
+}
+
+// Create zip for easy sharing - run: gradlew distZipRelease
+task distZipRelease(type: Zip, dependsOn: dist) {
+    description = 'Create zip file for sharing with other users'
+    group = 'distribution'
+    archiveBaseName = 'zetdcschemmatics'
+    archiveVersion = project.version
+    destinationDirectory = layout.buildDirectory.dir('dist')
+    from layout.buildDirectory.dir("dist/zetdcschemmatics")
+    doLast {
+        println "Zip created: build/dist/${archiveFile.get().asFile.name}"
+    }
+}

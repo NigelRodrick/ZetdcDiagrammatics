@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import com.zetdc.diagrammatics.models.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.zetdc.diagrammatics.controllers.MainController">
+   <top>
+      <VBox>
+         <children>
+            <MenuBar fx:id="menuBar">
+               <menus>
+                  <Menu mnemonicParsing="false" text="File">
+                     <items>
+                        <MenuItem fx:id="newFileItem" mnemonicParsing="false" text="New" />
+                        <MenuItem fx:id="openFileItem" mnemonicParsing="false" text="Open..." />
+                        <MenuItem fx:id="saveFileItem" mnemonicParsing="false" text="Save" />
+                        <MenuItem fx:id="saveAsFileItem" mnemonicParsing="false" text="Save As..." />
+                        <SeparatorMenuItem mnemonicParsing="false" />
+                        <MenuItem fx:id="exitItem" mnemonicParsing="false" text="Exit" />
+                     </items>
+                  </Menu>
+                  <Menu mnemonicParsing="false" text="Edit">
+                     <items>
+                        <MenuItem fx:id="undoItem" mnemonicParsing="false" text="Undo" />
+                        <MenuItem fx:id="redoItem" mnemonicParsing="false" text="Redo" />
+                        <SeparatorMenuItem mnemonicParsing="false" />
+                        <MenuItem fx:id="deleteItem" mnemonicParsing="false" text="Delete" />
+                        <MenuItem fx:id="clearItem" mnemonicParsing="false" text="Clear All" />
+                     </items>
+                  </Menu>
+                  <Menu mnemonicParsing="false" text="View">
+                     <items>
+                        <MenuItem fx:id="zoomInItem" mnemonicParsing="false" text="Zoom In" />
+                        <MenuItem fx:id="zoomOutItem" mnemonicParsing="false" text="Zoom Out" />
+                        <MenuItem fx:id="zoomFitItem" mnemonicParsing="false" text="Fit to Window" />
+                     </items>
+                  </Menu>
+                  <Menu mnemonicParsing="false" text="Help">
+                     <items>
+                        <MenuItem fx:id="aboutItem" mnemonicParsing="false" text="About" />
+                     </items>
+                  </Menu>
+               </menus>
+            </MenuBar>
+            <ToolBar fx:id="toolBar">
+               <items>
+                  <Button fx:id="selectToolButton" mnemonicParsing="false" text="Select" />
+                  <Separator orientation="VERTICAL" />
+                  <Button fx:id="rectangleToolButton" mnemonicParsing="false" text="Rectangle" />
+                  <Button fx:id="circleToolButton" mnemonicParsing="false" text="Circle" />
+                  <Button fx:id="lineToolButton" mnemonicParsing="false" text="Line" />
+                  <Button fx:id="textToolButton" mnemonicParsing="false" text="Text" />
+                  <Separator orientation="VERTICAL" />
+                  <Button fx:id="undoButton" mnemonicParsing="false" text="Undo" />
+                  <Button fx:id="redoButton" mnemonicParsing="false" text="Redo" />
+                  <Separator orientation="VERTICAL" />
+                  <Button fx:id="deleteButton" mnemonicParsing="false" text="Delete" />
+               </items>
+            </ToolBar>
+         </children>
+      </VBox>
+   </top>
+   <left>
+      <VBox fx:id="leftPanel" prefWidth="200.0" spacing="10.0" styleClass="left-panel">
+         <children>
+            <Label styleClass="section-title" text="Properties" />
+            <VBox spacing="5.0">
+               <children>
+                  <Label text="Fill Color:" />
+                  <ColorPicker fx:id="fillColorPicker" />
+               </children>
+            </VBox>
+            <VBox spacing="5.0">
+               <children>
+                  <Label text="Stroke Color:" />
+                  <ColorPicker fx:id="strokeColorPicker" />
+               </children>
+            </VBox>
+            <VBox spacing="5.0">
+               <children>
+                  <HBox spacing="5.0">
+                     <children>
+                        <Label text="Stroke Width:" />
+                        <Label fx:id="strokeWidthLabel" text="2.0" />
+                     </children>
+                  </HBox>
+                  <Slider fx:id="strokeWidthSlider" max="10.0" min="0.5" value="2.0" />
+               </children>
+            </VBox>
+            <Separator />
+            <Label styleClass="section-title" text="Shapes" />
+            <VBox spacing="5.0">
+               <children>
+                  <Label text="Total Shapes: 0" fx:id="shapeCountLabel" />
+                  <Button mnemonicParsing="false" onAction="#clearCanvas" text="Clear Canvas" />
+               </children>
+            </VBox>
+         </children>
+         <padding>
+            <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+         </padding>
+      </VBox>
+   </left>
+   <center>
+      <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="ALWAYS" vbarPolicy="ALWAYS">
+         <children>
+            <DrawingCanvas fx:id="drawingCanvas" height="600.0" width="800.0" />
+         </children>
+      </ScrollPane>
+   </center>
+   <bottom>
+      <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="status-bar">
+         <children>
+            <Label text="Ready" fx:id="statusLabel" />
+            <Separator orientation="VERTICAL" />
+            <Label text="Tool: Select" fx:id="toolLabel" />
+            <Separator orientation="VERTICAL" />
+            <Label text="Shapes: 0" fx:id="shapeCountStatusLabel" />
+         </children>
+         <padding>
+            <Insets bottom="5.0" left="10.0" right="10.0" top="5.0" />
+         </padding>
+      </HBox>
+   </bottom>
+</BorderPane>
+
+

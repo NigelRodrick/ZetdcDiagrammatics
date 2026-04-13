@@ -1,0 +1,24 @@
+## Build and IDE artifacts
+/.gradle/
+/build/
+/bin/
+/.metadata/
+
+## Logs and error dumps
+*.log
+hs_err_pid*.log
+
+## Java / Gradle
+*.class
+*.jar
+
+## OS junk
+Thumbs.db
+Desktop.ini
+
+
+## Local install artifacts
+/FinalInstallation/
+/TV-Install/
+/Laptop-Install/
+*.msi
