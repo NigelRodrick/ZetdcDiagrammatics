@@ -144,6 +144,11 @@ processResources {
     from('src/resources') {
         into 'resources'
     }
+    // Ship project-root logo on classpath (/logo.jfif) so installed EXE shows correct window icon
+    def rootLogo = file('logo.jfif')
+    if (rootLogo.exists()) {
+        from(rootLogo)
+    }
 }
 
 // Create shareable distribution - run: gradlew dist

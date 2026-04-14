@@ -29,6 +29,27 @@ jobs:
         run: |
           gradle fatJar
 
+      - name: Create Windows icon from logo.jfif
+        shell: pwsh
+        run: |
+          if (-not (Test-Path logo.jfif)) {
+            Write-Host "logo.jfif missing; using zetdcschemmatics.ico"
+            Copy-Item zetdcschemmatics.ico app.ico
+            exit 0
+          }
+          choco install imagemagick -y --no-progress
+          $magick = Get-ChildItem -Path "${env:ProgramFiles}\ImageMagick-*\magick.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $magick) {
+            Write-Warning "magick.exe not found; using zetdcschemmatics.ico"
+            Copy-Item zetdcschemmatics.ico app.ico
+            exit 0
+          }
+          & $magick.FullName convert logo.jfif -define icon:auto-resize=256,128,64,48,32,16 app.ico
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path app.ico)) {
+            Write-Warning "Icon conversion failed; using zetdcschemmatics.ico"
+            Copy-Item zetdcschemmatics.ico app.ico
+          }
+
       - name: Create EXE installer with jpackage
         shell: pwsh
         run: |
@@ -39,7 +60,7 @@ jobs:
             --input build\libs `
             --main-jar zetdcschemmatics-fat.jar `
             --main-class com.zetdc.diagrammatics.Main `
-            --icon zetdcschemmatics.ico `
+            --icon app.ico `
             --vendor "ZETDC Southern Region" `
             --win-shortcut `
             --win-menu `
